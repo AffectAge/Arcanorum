@@ -55,6 +55,9 @@ function processBuildingConstruction() {
     var stateStatisticsValue = stateStatisticsRange.getValue();
     var stateStatisticsData = stateStatisticsValue ? JSON.parse(stateStatisticsValue) : {};
 
+    // Обнуление construction_costs
+    stateStatisticsData.construction_costs = 0;
+
     // Вызов дополнительной функции для обработки статуса "Подготовка к строительству"
     var preparationResult = processConstructionPreparation(
       constructionValues,
@@ -71,6 +74,18 @@ function processBuildingConstruction() {
     warehouseValues = preparationResult.warehouseValues;
     stateStatisticsData = preparationResult.stateStatisticsData;
     eventLog = eventLog.concat(preparationResult.eventLog);
+
+    // Вызов новой функции для увеличения "Накоплено строительства"
+    var incrementResult = incrementAccumulatedConstruction(
+      constructionValues,
+      stateStatisticsData,
+      eventLog
+    );
+
+    // Обновляем переменные после вызова функции
+    constructionValues = incrementResult.constructionValues;
+    stateStatisticsData = incrementResult.stateStatisticsData;
+    eventLog = incrementResult.eventLog;
 
     // Обработка статуса "Строительство завершено"
     // Определяем индексы столбцов
@@ -438,6 +453,108 @@ function processConstructionPreparation(constructionValues, constructionFormulas
   return {
     constructionValues: updatedConstructionValues,
     warehouseValues: warehouseValues,
+    stateStatisticsData: stateStatisticsData,
+    eventLog: eventLog
+  };
+}
+
+function incrementAccumulatedConstruction(constructionValues, stateStatisticsData, eventLog) {
+  // Определяем индексы необходимых столбцов
+  var headers = constructionValues[0];
+  var accumulatedIndex = headers.indexOf('Накоплено строительства');
+  var requiredIndex = headers.indexOf('Необходимо строительства'); // Новый индекс для "Необходимо строительства"
+  var resourceProvisionIndex = headers.indexOf('Обеспечение ресурсов');
+  var statusIndex = headers.indexOf('Статус');
+  var buildingNameIndex = headers.indexOf('Название постройки');
+  var buildingOwnerIndex = headers.indexOf('Владелец постройки');
+  var provinceIndex = headers.indexOf('Провинция');
+
+  // Проверяем наличие необходимых столбцов
+  if (
+    accumulatedIndex === -1 ||
+    requiredIndex === -1 || // Проверка наличия "Необходимо строительства"
+    resourceProvisionIndex === -1 ||
+    statusIndex === -1 ||
+    buildingNameIndex === -1 ||
+    buildingOwnerIndex === -1 ||
+    provinceIndex === -1
+  ) {
+    throw new Error('Не удалось найти необходимые столбцы для увеличения накопления строительства.');
+  }
+
+  // Получаем значение construction_speed или устанавливаем по умолчанию 10
+  var constructionSpeed = stateStatisticsData.construction_speed;
+  if (constructionSpeed == null) {
+    constructionSpeed = 10;
+    stateStatisticsData.construction_speed = 10;
+    eventLog.push(['Ключ "construction_speed" не найден в "Переменные_СтроительствоСтатистика". Установлено значение по умолчанию 10.', 'Информация']);
+  }
+
+  // Находим все строки, соответствующие условиям
+  var matchingRows = [];
+  for (var i = 1; i < constructionValues.length; i++) { // Начинаем с 1, пропуская заголовки
+    var row = constructionValues[i];
+    var resourceProvision = row[resourceProvisionIndex];
+    var status = row[statusIndex];
+    var buildingName = row[buildingNameIndex];
+    var buildingOwner = row[buildingOwnerIndex];
+    var province = row[provinceIndex];
+    var accumulated = parseFloat(row[accumulatedIndex]) || 0;
+    var required = parseFloat(row[requiredIndex]) || 0;
+
+    // Добавляем условие: Накоплено строительства должно быть меньше Необходимо строительства
+    if (
+      resourceProvision === 'Ресурсы обеспечены' &&
+      status === 'Провинция подходит' &&
+      buildingName &&
+      buildingOwner &&
+      province &&
+      accumulated < required // Новое условие
+    ) {
+      matchingRows.push(i);
+    }
+  }
+
+  var numberOfMatches = matchingRows.length;
+
+  if (numberOfMatches > 0) {
+    // Распределяем constructionSpeed поровну между всеми совпадающими строками
+    var perRowIncrementRaw = constructionSpeed / numberOfMatches;
+    var perRowIncrement = Math.round(perRowIncrementRaw * 100) / 100; // Округляем до сотых
+
+    // Для учета возможных ошибок округления, вычисляем остаток
+    var totalDistributed = perRowIncrement * numberOfMatches;
+    var remainder = Math.round((constructionSpeed - totalDistributed) * 100) / 100;
+
+    // Добавляем остаток к первой строке
+    for (var j = 0; j < matchingRows.length; j++) {
+      var rowIndex = matchingRows[j];
+      var increment = perRowIncrement;
+      if (j === 0) {
+        increment += remainder;
+        // Округляем снова после добавления остатка
+        increment = Math.round(increment * 100) / 100;
+      }
+      
+      var currentAccumulated = parseFloat(constructionValues[rowIndex][accumulatedIndex]) || 0;
+      var requiredConstruction = parseFloat(constructionValues[rowIndex][requiredIndex]) || 0;
+      var newAccumulated = currentAccumulated + increment;
+
+      // Проверяем, чтобы новое накопленное значение не превышало необходимое
+      if (newAccumulated > requiredConstruction) {
+        increment = requiredConstruction - currentAccumulated;
+        newAccumulated = requiredConstruction;
+      }
+
+      constructionValues[rowIndex][accumulatedIndex] = Math.round(newAccumulated * 100) / 100;
+
+      // Логируем событие
+      eventLog.push(['Строка ' + (rowIndex + 1) + ': Накоплено строительства увеличено на ' + increment + ' до ' + constructionValues[rowIndex][accumulatedIndex] + '.', 'Информация']);
+    }
+  }
+
+  return {
+    constructionValues: constructionValues,
     stateStatisticsData: stateStatisticsData,
     eventLog: eventLog
   };
