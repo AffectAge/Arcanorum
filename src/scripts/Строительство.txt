@@ -3,9 +3,9 @@ function processBuildingConstruction() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // Получаем данные провинций
+    // Загрузка данных из именованных диапазонов
     var provincesRange = ss.getRangeByName('Провинции_ОсновнаяИнформация');
-    var provincesValues = provincesRange.getValues(); // Получаем значения из диапазона
+    var provincesValues = provincesRange.getValues();
     var provincesData = []; // Массив для хранения данных провинций
     var eventLog = []; // Массив для сообщений в журнал событий
 
@@ -17,39 +17,96 @@ function processBuildingConstruction() {
           var provinceData = JSON.parse(cellValue);
           provincesData.push(provinceData);
         } catch (e) {
-          // Если ошибка при парсинге, записываем сообщение в журнал событий
           eventLog.push(['Ошибка парсинга данных провинции в строке ' + (i + 1) + ': ' + e.message, 'Ошибка']);
-          // Добавляем пустой элемент, чтобы сохранить соответствие индексов
           provincesData.push(null);
         }
       } else {
-        // Ячейка пустая, добавляем null в массив, чтобы сохранить соответствие индексов
         provincesData.push(null);
       }
     }
 
-    // Получаем данные строительства
+    // Загрузка данных строительства
     var constructionRange = ss.getRangeByName('Строительство_СтроительствоЗданий');
     var constructionValues = constructionRange.getValues();
-    var constructionFormulas = constructionRange.getFormulas(); // Получаем формулы
+    var constructionFormulas = constructionRange.getFormulas();
 
-    // Определяем индексы столбцов по названиям
+    // Загрузка шаблонов построек
+    var buildingTemplatesRange = ss.getRangeByName('Постройки_Шаблоны');
+    var buildingTemplatesValues = buildingTemplatesRange.getValues();
+    var buildingTemplatesData = buildingTemplatesValues.map(function(row) {
+      if (row[0]) {
+        try {
+          return JSON.parse(row[0]);
+        } catch (e) {
+          Logger.log('Ошибка парсинга шаблона постройки: ' + e.message);
+          return null;
+        }
+      } else {
+        return null;
+      }
+    });
+
+    // Загрузка данных склада товаров
+    var warehouseRange = ss.getRangeByName('СкладТоваров_ОсновнаяИнформация');
+    var warehouseValues = warehouseRange.getValues();
+
+    // Загрузка статистики государства
+    var stateStatisticsRange = ss.getRangeByName('Переменные_СтатистикаГосударства');
+    var stateStatisticsValue = stateStatisticsRange.getValue();
+    var stateStatisticsData = stateStatisticsValue ? JSON.parse(stateStatisticsValue) : {};
+
+    // Вызов дополнительной функции для обработки статуса "Подготовка к строительству"
+    var preparationResult = processConstructionPreparation(
+      constructionValues,
+      constructionFormulas,
+      buildingTemplatesData,
+      warehouseValues,
+      stateStatisticsData,
+      provincesData,
+      eventLog
+    );
+
+    // Обновление данных после обработки
+    constructionValues = preparationResult.constructionValues;
+    warehouseValues = preparationResult.warehouseValues;
+    stateStatisticsData = preparationResult.stateStatisticsData;
+    eventLog = eventLog.concat(preparationResult.eventLog);
+
+    // Обработка статуса "Строительство завершено"
+    // Определяем индексы столбцов
     var constructionHeaders = constructionValues[0];
     var nameIndex = constructionHeaders.indexOf('Название постройки');
     var ownerIndex = constructionHeaders.indexOf('Владелец постройки');
     var provinceIdIndex = constructionHeaders.indexOf('Провинция');
     var quantityIndex = constructionHeaders.indexOf('Количество');
     var statusIndex = constructionHeaders.indexOf('Статус строительства');
-    var accumulatedIndex = constructionHeaders.indexOf('Накоплено строительства'); // Индекс столбца "Накоплено строительства"
-    var requiredIndex = constructionHeaders.indexOf('Необходимо строительства'); // Индекс столбца "Необходимо строительства"
+    var accumulatedIndex = constructionHeaders.indexOf('Накоплено строительства');
+    var requiredIndex = constructionHeaders.indexOf('Необходимо строительства');
+    
+    // Дополнительные индексы для "Обеспечение ресурсов" и "Необходимо ресурсов"
+    var resourceProvisionIndex = constructionHeaders.indexOf('Обеспечение ресурсов');
+    var requiredResourcesIndex = constructionHeaders.indexOf('Необходимо ресурсов');
 
-    // Если не нашли необходимые столбцы, выводим ошибку и завершаем скрипт
-    if (nameIndex === -1 || ownerIndex === -1 || provinceIdIndex === -1 || quantityIndex === -1 || statusIndex === -1 || accumulatedIndex === -1 || requiredIndex === -1) {
+    // Проверяем наличие необходимых столбцов
+    if (
+      nameIndex === -1 ||
+      ownerIndex === -1 ||
+      provinceIdIndex === -1 ||
+      quantityIndex === -1 ||
+      statusIndex === -1 ||
+      accumulatedIndex === -1 ||
+      requiredIndex === -1 ||
+      resourceProvisionIndex === -1 ||
+      requiredResourcesIndex === -1
+    ) {
       throw new Error('Не удалось найти необходимые столбцы в диапазоне Строительство_СтроительствоЗданий.');
     }
 
-    // Массив для обновленных данных строительства
-    // Копируем текущие значения, чтобы сохранить формулы
+    // Логирование индексов для отладки
+    Logger.log('resourceProvisionIndex: ' + resourceProvisionIndex);
+    Logger.log('requiredResourcesIndex: ' + requiredResourcesIndex);
+
+    // Обновленные значения строительства
     var updatedConstructionValues = constructionValues.map(function(row) {
       return row.slice();
     });
@@ -65,17 +122,16 @@ function processBuildingConstruction() {
         var provinceId = row[provinceIdIndex];
         var quantity = row[quantityIndex];
 
-        // Проверяем, что все необходимые данные заполнены
         if (!buildingName || !buildingOwner || !provinceId || !quantity) {
           eventLog.push(['Строка ' + (i + 1) + ': недостаточно данных для размещения постройки.', 'Ошибка']);
-          // Очищаем данные в необходимых столбцах
           updatedConstructionValues[i][nameIndex] = '';
           updatedConstructionValues[i][ownerIndex] = '';
           updatedConstructionValues[i][provinceIdIndex] = '';
           updatedConstructionValues[i][quantityIndex] = 1;
-          // Устанавливаем Накоплено строительства и Необходимо строительства в 0
           updatedConstructionValues[i][accumulatedIndex] = 0;
           updatedConstructionValues[i][requiredIndex] = 0;
+          updatedConstructionValues[i][resourceProvisionIndex] = '';
+          updatedConstructionValues[i][requiredResourcesIndex] = '';
           continue;
         }
 
@@ -99,12 +155,10 @@ function processBuildingConstruction() {
               "expenses": 0,
               "status": "Активная",
               "self_destruction": 10
-              // Добавьте дополнительные ключи и значения здесь, если необходимо
             };
 
             // Добавляем указанное количество построек в провинцию
             for (var k = 0; k < quantity; k++) {
-              // Создаем копию объекта постройки, чтобы объекты были независимыми
               var newBuilding = JSON.parse(JSON.stringify(buildingTemplate));
               province.buildings.push(newBuilding);
             }
@@ -120,26 +174,33 @@ function processBuildingConstruction() {
         }
 
         if (!provinceFound) {
-          // Провинция не найдена, добавляем сообщение в журнал событий
           eventLog.push(['Строка ' + (i + 1) + ': провинция с ID "' + provinceId + '" не найдена.', 'Ошибка']);
         }
 
-        // Очищаем данные в необходимых столбцах
+        // Очистка данных
         updatedConstructionValues[i][nameIndex] = '';
         updatedConstructionValues[i][ownerIndex] = '';
         updatedConstructionValues[i][provinceIdIndex] = '';
         updatedConstructionValues[i][quantityIndex] = 1;
-        // Устанавливаем Накоплено строительства и Необходимо строительства в 0
         updatedConstructionValues[i][accumulatedIndex] = 0;
         updatedConstructionValues[i][requiredIndex] = 0;
+        updatedConstructionValues[i][resourceProvisionIndex] = '';
+        updatedConstructionValues[i][requiredResourcesIndex] = '';
       }
     }
 
-    // Записываем обновленные данные строительства обратно в диапазон
-    // Чтобы избежать перезаписи столбцов с формулами, обновляем только необходимые столбцы
-    // Например, если нужно обновить столбцы: name, owner, provinceId, quantity, accumulated, required
-
-    var columnsToUpdate = [nameIndex, ownerIndex, provinceIdIndex, quantityIndex, accumulatedIndex, requiredIndex];
+    // Записываем обновленные данные обратно в диапазоны
+    // Обновляем данные строительства
+    var columnsToUpdate = [
+      nameIndex,
+      ownerIndex,
+      provinceIdIndex,
+      quantityIndex,
+      accumulatedIndex,
+      requiredIndex,
+      resourceProvisionIndex,
+      requiredResourcesIndex
+    ];
     columnsToUpdate.forEach(function(colIndex) {
       var columnRange = constructionRange.offset(0, colIndex, constructionValues.length, 1);
       var columnValues = updatedConstructionValues.map(function(row) {
@@ -148,20 +209,22 @@ function processBuildingConstruction() {
       columnRange.setValues(columnValues);
     });
 
+    // Обновляем данные склада
+    warehouseRange.setValues(warehouseValues);
+
+    // Обновляем статистику государства
+    stateStatisticsRange.setValue(JSON.stringify(stateStatisticsData));
+
     // Обновляем данные провинций
     var updatedProvincesValues = [];
     for (var i = 0; i < provincesData.length; i++) {
       var province = provincesData[i];
       if (province) {
-        // Преобразуем объект провинции обратно в JSON строку
         updatedProvincesValues.push([JSON.stringify(province)]);
       } else {
-        // Если провинция отсутствует (null), оставляем ячейку пустой
         updatedProvincesValues.push(['']);
       }
     }
-
-    // Записываем обновленные данные провинций обратно в диапазон
     provincesRange.setValues(updatedProvincesValues);
 
     // Записываем сообщения в журнал событий
@@ -180,4 +243,178 @@ function processBuildingConstruction() {
   } catch (e) {
     Logger.log('Ошибка: ' + e.message);
   }
+}
+
+function processConstructionPreparation(constructionValues, constructionFormulas, buildingTemplatesData, warehouseValues, stateStatisticsData, provincesData, eventLog) {
+  // Определяем индексы столбцов в constructionValues
+  var constructionHeaders = constructionValues[0];
+  var nameIndex = constructionHeaders.indexOf('Название постройки');
+  var ownerIndex = constructionHeaders.indexOf('Владелец постройки');
+  var provinceIdIndex = constructionHeaders.indexOf('Провинция');
+  var quantityIndex = constructionHeaders.indexOf('Количество');
+  var statusIndex = constructionHeaders.indexOf('Статус строительства');
+  var accumulatedIndex = constructionHeaders.indexOf('Накоплено строительства');
+  var requiredIndex = constructionHeaders.indexOf('Необходимо строительства');
+  var constructionStatusIndex = constructionHeaders.indexOf('Статус');
+  var resourceProvisionIndex = constructionHeaders.indexOf('Обеспечение ресурсов');
+  var requiredResourcesIndex = constructionHeaders.indexOf('Необходимо ресурсов');
+
+  // Определяем индексы для warehouseValues
+  var warehouseHeaders = warehouseValues[0];
+  var warehouseResourceNameIndex = warehouseHeaders.indexOf('Название товара');
+  var warehouseDemandIndex = warehouseHeaders.indexOf('Спрос');
+  var warehouseSupplyIndex = warehouseHeaders.indexOf('Предложения');
+  var warehousePriceIndex = warehouseHeaders.indexOf('Цены');
+  var warehouseAccumulatedIndex = warehouseHeaders.indexOf('Накоплено');
+
+  // Проверяем наличие необходимых столбцов
+  if (
+    nameIndex === -1 ||
+    ownerIndex === -1 ||
+    provinceIdIndex === -1 ||
+    quantityIndex === -1 ||
+    statusIndex === -1 ||
+    accumulatedIndex === -1 ||
+    requiredIndex === -1 ||
+    constructionStatusIndex === -1 ||
+    resourceProvisionIndex === -1 ||
+    requiredResourcesIndex === -1
+  ) {
+    throw new Error('Не удалось найти необходимые столбцы в диапазоне Строительство_СтроительствоЗданий.');
+  }
+
+  // Логирование индексов для отладки
+  Logger.log('processConstructionPreparation - resourceProvisionIndex: ' + resourceProvisionIndex);
+  Logger.log('processConstructionPreparation - requiredResourcesIndex: ' + requiredResourcesIndex);
+
+  // Обновленные значения строительства
+  var updatedConstructionValues = constructionValues.map(function(row) {
+    return row.slice();
+  });
+
+  // Обрабатываем каждую строку
+  for (var i = 1; i < constructionValues.length; i++) {
+    var row = constructionValues[i];
+    var constructionStatus = row[statusIndex];
+
+    if (constructionStatus === 'Подготовка к строительству') {
+      var status = row[constructionStatusIndex];
+      var buildingName = row[nameIndex];
+      var provinceId = row[provinceIdIndex];
+      var quantity = row[quantityIndex];
+      var resourceProvision = row[resourceProvisionIndex];
+
+      if (status === 'Провинция не подходит') {
+        eventLog.push(['Строка ' + (i + 1) + ': Провинция с ID "' + provinceId + '" не подходит для постройки "' + buildingName + '". Строительство будет отменено.', 'Ошибка']);
+
+        // Очищаем столбцы
+        updatedConstructionValues[i][nameIndex] = '';
+        updatedConstructionValues[i][ownerIndex] = '';
+        updatedConstructionValues[i][provinceIdIndex] = '';
+        updatedConstructionValues[i][quantityIndex] = 1;
+        updatedConstructionValues[i][accumulatedIndex] = 0;
+        updatedConstructionValues[i][requiredIndex] = 0;
+        updatedConstructionValues[i][resourceProvisionIndex] = '';
+        updatedConstructionValues[i][requiredResourcesIndex] = '';
+
+        continue;
+      }
+
+      if (status === 'Провинция подходит' && resourceProvision !== 'Ресурсы обеспечены') {
+        // Ищем шаблон постройки
+        var buildingTemplate = buildingTemplatesData.find(function(template) {
+          return template && template.name === buildingName;
+        });
+
+        if (!buildingTemplate) {
+          eventLog.push(['Строка ' + (i + 1) + ': Шаблон постройки "' + buildingName + '" не найден.', 'Ошибка']);
+          continue;
+        }
+
+        // Получаем construction_costs
+        var constructionCosts = buildingTemplate.construction_costs || {};
+        var requiredResources = {};
+        var allResourcesAvailable = true;
+
+        // Для каждого ресурса в construction_costs
+        for (var resourceName in constructionCosts) {
+          var requiredAmount = constructionCosts[resourceName] * quantity;
+          // Ищем ресурс в warehouseValues
+          var resourceRowIndex = -1;
+          for (var j = 1; j < warehouseValues.length; j++) {
+            if (warehouseValues[j][warehouseResourceNameIndex] === resourceName) {
+              resourceRowIndex = j;
+              break;
+            }
+          }
+
+          if (resourceRowIndex === -1) {
+            eventLog.push(['Строка ' + (i + 1) + ': Ресурс "' + resourceName + '" не найден в складе.', 'Ошибка']);
+            allResourcesAvailable = false;
+            requiredResources[resourceName] = requiredAmount;
+            continue;
+          }
+
+          var availableAmount = warehouseValues[resourceRowIndex][warehouseAccumulatedIndex];
+          if (availableAmount >= requiredAmount) {
+            // Достаточно ресурса
+            // Списываем из накопленного
+            warehouseValues[resourceRowIndex][warehouseAccumulatedIndex] -= requiredAmount;
+            // Добавляем в спрос
+            warehouseValues[resourceRowIndex][warehouseDemandIndex] += requiredAmount;
+            // Рассчитываем стоимость и добавляем в stateStatisticsData.construction_costs
+            var resourcePrice = warehouseValues[resourceRowIndex][warehousePriceIndex];
+            var cost = requiredAmount * resourcePrice;
+            stateStatisticsData.construction_costs = (stateStatisticsData.construction_costs || 0) + cost;
+          } else {
+            // Недостаточно ресурса
+            allResourcesAvailable = false;
+            var lackingAmount = requiredAmount - availableAmount;
+            if (requiredResources[resourceName]) {
+              requiredResources[resourceName] += lackingAmount;
+            } else {
+              requiredResources[resourceName] = lackingAmount;
+            }
+
+            eventLog.push(['Строка ' + (i + 1) + ': Недостаточно ресурса "' + resourceName + '". Необходимо: ' + requiredAmount + ', доступно: ' + availableAmount, 'Ошибка']);
+          }
+        }
+
+        if (!allResourcesAvailable) {
+          // Записываем 'Недостаточно ресурсов' в 'Обеспечение ресурсов'
+          updatedConstructionValues[i][resourceProvisionIndex] = 'Недостаточно ресурсов';
+          // Записываем необходимые ресурсы в 'Необходимо ресурсов'
+          var requiredResourcesList = [];
+          for (var res in requiredResources) {
+            requiredResourcesList.push(res + ' ' + requiredResources[res]);
+          }
+          updatedConstructionValues[i][requiredResourcesIndex] = requiredResourcesList.join(', ');
+
+          // Добавляем подробный лог
+          Logger.log('Строка ' + (i + 1) + ': Недостающие ресурсы - ' + requiredResourcesList.join(', '));
+
+          eventLog.push(['Строка ' + (i + 1) + ': Недостаточно ресурсов для строительства "' + buildingName + '" в провинции "' + provinceId + '". Необходимо: ' + requiredResourcesList.join(', '), 'Ошибка']);
+
+          continue;
+        } else {
+          // Все ресурсы доступны
+          updatedConstructionValues[i][resourceProvisionIndex] = 'Ресурсы обеспечены';
+          updatedConstructionValues[i][requiredResourcesIndex] = '';
+
+          // Получаем required_construction_points из шаблона
+          var requiredConstructionPoints = buildingTemplate.required_construction_points || 0;
+          var totalRequiredConstructionPoints = requiredConstructionPoints * quantity;
+
+          updatedConstructionValues[i][requiredIndex] = totalRequiredConstructionPoints;
+        }
+      }
+    }
+  }
+
+  return {
+    constructionValues: updatedConstructionValues,
+    warehouseValues: warehouseValues,
+    stateStatisticsData: stateStatisticsData,
+    eventLog: eventLog
+  };
 }
