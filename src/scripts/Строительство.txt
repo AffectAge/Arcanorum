@@ -1,0 +1,183 @@
+function processBuildingConstruction() {
+  var startTime = new Date();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Получаем данные провинций
+    var provincesRange = ss.getRangeByName('Провинции_ОсновнаяИнформация');
+    var provincesValues = provincesRange.getValues(); // Получаем значения из диапазона
+    var provincesData = []; // Массив для хранения данных провинций
+    var eventLog = []; // Массив для сообщений в журнал событий
+
+    // Парсим данные провинций
+    for (var i = 0; i < provincesValues.length; i++) {
+      var cellValue = provincesValues[i][0];
+      if (cellValue) {
+        try {
+          var provinceData = JSON.parse(cellValue);
+          provincesData.push(provinceData);
+        } catch (e) {
+          // Если ошибка при парсинге, записываем сообщение в журнал событий
+          eventLog.push(['Ошибка парсинга данных провинции в строке ' + (i + 1) + ': ' + e.message, 'Ошибка']);
+          // Добавляем пустой элемент, чтобы сохранить соответствие индексов
+          provincesData.push(null);
+        }
+      } else {
+        // Ячейка пустая, добавляем null в массив, чтобы сохранить соответствие индексов
+        provincesData.push(null);
+      }
+    }
+
+    // Получаем данные строительства
+    var constructionRange = ss.getRangeByName('Строительство_СтроительствоЗданий');
+    var constructionValues = constructionRange.getValues();
+    var constructionFormulas = constructionRange.getFormulas(); // Получаем формулы
+
+    // Определяем индексы столбцов по названиям
+    var constructionHeaders = constructionValues[0];
+    var nameIndex = constructionHeaders.indexOf('Название постройки');
+    var ownerIndex = constructionHeaders.indexOf('Владелец постройки');
+    var provinceIdIndex = constructionHeaders.indexOf('Провинция');
+    var quantityIndex = constructionHeaders.indexOf('Количество');
+    var statusIndex = constructionHeaders.indexOf('Статус строительства');
+    var accumulatedIndex = constructionHeaders.indexOf('Накоплено строительства'); // Индекс столбца "Накоплено строительства"
+    var requiredIndex = constructionHeaders.indexOf('Необходимо строительства'); // Индекс столбца "Необходимо строительства"
+
+    // Если не нашли необходимые столбцы, выводим ошибку и завершаем скрипт
+    if (nameIndex === -1 || ownerIndex === -1 || provinceIdIndex === -1 || quantityIndex === -1 || statusIndex === -1 || accumulatedIndex === -1 || requiredIndex === -1) {
+      throw new Error('Не удалось найти необходимые столбцы в диапазоне Строительство_СтроительствоЗданий.');
+    }
+
+    // Массив для обновленных данных строительства
+    // Копируем текущие значения, чтобы сохранить формулы
+    var updatedConstructionValues = constructionValues.map(function(row) {
+      return row.slice();
+    });
+
+    // Обрабатываем каждую строку строительства
+    for (var i = 1; i < constructionValues.length; i++) {
+      var row = constructionValues[i];
+      var status = row[statusIndex];
+
+      if (status === 'Строительство завершено') {
+        var buildingName = row[nameIndex];
+        var buildingOwner = row[ownerIndex];
+        var provinceId = row[provinceIdIndex];
+        var quantity = row[quantityIndex];
+
+        // Проверяем, что все необходимые данные заполнены
+        if (!buildingName || !buildingOwner || !provinceId || !quantity) {
+          eventLog.push(['Строка ' + (i + 1) + ': недостаточно данных для размещения постройки.', 'Ошибка']);
+          // Очищаем данные в необходимых столбцах
+          updatedConstructionValues[i][nameIndex] = '';
+          updatedConstructionValues[i][ownerIndex] = '';
+          updatedConstructionValues[i][provinceIdIndex] = '';
+          updatedConstructionValues[i][quantityIndex] = 1;
+          // Устанавливаем Накоплено строительства и Необходимо строительства в 0
+          updatedConstructionValues[i][accumulatedIndex] = 0;
+          updatedConstructionValues[i][requiredIndex] = 0;
+          continue;
+        }
+
+        // Ищем провинцию по province_id
+        var provinceFound = false;
+        for (var j = 0; j < provincesData.length; j++) {
+          var province = provincesData[j];
+          if (province && province.province_id == provinceId) {
+            provinceFound = true;
+
+            // Инициализируем массив buildings, если он отсутствует
+            if (!province.buildings) {
+              province.buildings = [];
+            }
+
+            // Создаем объект постройки с необходимыми ключами
+            var buildingTemplate = {
+              "name": buildingName,
+              "building_owner": buildingOwner,
+              "incomes": 0,
+              "expenses": 0,
+              "status": "Активная",
+              "self_destruction": 10
+              // Добавьте дополнительные ключи и значения здесь, если необходимо
+            };
+
+            // Добавляем указанное количество построек в провинцию
+            for (var k = 0; k < quantity; k++) {
+              // Создаем копию объекта постройки, чтобы объекты были независимыми
+              var newBuilding = JSON.parse(JSON.stringify(buildingTemplate));
+              province.buildings.push(newBuilding);
+            }
+
+            // Обновляем данные провинции в массиве provincesData
+            provincesData[j] = province;
+
+            // Добавляем сообщение в журнал событий с указанием владельца построек
+            eventLog.push(['В провинции "' + provinceId + '" построено ' + quantity + ' ед. постройки "' + buildingName + '" (Владелец: ' + buildingOwner + ').', 'Информация']);
+
+            break;
+          }
+        }
+
+        if (!provinceFound) {
+          // Провинция не найдена, добавляем сообщение в журнал событий
+          eventLog.push(['Строка ' + (i + 1) + ': провинция с ID "' + provinceId + '" не найдена.', 'Ошибка']);
+        }
+
+        // Очищаем данные в необходимых столбцах
+        updatedConstructionValues[i][nameIndex] = '';
+        updatedConstructionValues[i][ownerIndex] = '';
+        updatedConstructionValues[i][provinceIdIndex] = '';
+        updatedConstructionValues[i][quantityIndex] = 1;
+        // Устанавливаем Накоплено строительства и Необходимо строительства в 0
+        updatedConstructionValues[i][accumulatedIndex] = 0;
+        updatedConstructionValues[i][requiredIndex] = 0;
+      }
+    }
+
+    // Записываем обновленные данные строительства обратно в диапазон
+    // Чтобы избежать перезаписи столбцов с формулами, обновляем только необходимые столбцы
+    // Например, если нужно обновить столбцы: name, owner, provinceId, quantity, accumulated, required
+
+    var columnsToUpdate = [nameIndex, ownerIndex, provinceIdIndex, quantityIndex, accumulatedIndex, requiredIndex];
+    columnsToUpdate.forEach(function(colIndex) {
+      var columnRange = constructionRange.offset(0, colIndex, constructionValues.length, 1);
+      var columnValues = updatedConstructionValues.map(function(row) {
+        return [row[colIndex]];
+      });
+      columnRange.setValues(columnValues);
+    });
+
+    // Обновляем данные провинций
+    var updatedProvincesValues = [];
+    for (var i = 0; i < provincesData.length; i++) {
+      var province = provincesData[i];
+      if (province) {
+        // Преобразуем объект провинции обратно в JSON строку
+        updatedProvincesValues.push([JSON.stringify(province)]);
+      } else {
+        // Если провинция отсутствует (null), оставляем ячейку пустой
+        updatedProvincesValues.push(['']);
+      }
+    }
+
+    // Записываем обновленные данные провинций обратно в диапазон
+    provincesRange.setValues(updatedProvincesValues);
+
+    // Записываем сообщения в журнал событий
+    if (eventLog.length > 0) {
+      var eventLogSheet = ss.getSheetByName('Журнал событий');
+      if (eventLogSheet) {
+        var lastRow = eventLogSheet.getLastRow();
+        eventLogSheet.getRange(lastRow + 1, 1, eventLog.length, 2).setValues(eventLog);
+      } else {
+        Logger.log('Лист "Журнал событий" не найден.');
+      }
+    }
+
+    var endTime = new Date();
+    Logger.log('Скрипт выполнен успешно за ' + ((endTime - startTime) / 1000) + ' секунд.');
+  } catch (e) {
+    Logger.log('Ошибка: ' + e.message);
+  }
+}
