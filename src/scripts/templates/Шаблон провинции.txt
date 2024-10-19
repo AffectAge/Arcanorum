@@ -1,0 +1,36 @@
+{
+"province_id":"1",
+"owner":"Украина",
+"population":300000,
+"agricultural_land":10000,
+"available_workers":120000,
+"occupied_workers":10000,
+"buildings":[
+{"name":"Универсальный завод","building_owner":"Украина","incomes":1440000,"expenses":200000,"status":"Активная","self_destruction":10},
+{"name":"Кирпичный завод","building_owner":"Украина","incomes":0,"expenses":0,"status":"Активная","self_destruction":10},
+{"name":"Кирпичный завод","building_owner":"Украина","incomes":0,"expenses":0,"status":"Активная","self_destruction":10},
+{"name":"Кирпичный завод","building_owner":"Украина","incomes":0,"expenses":0,"status":"Активная","self_destruction":10},
+{"name":"Кирпичный завод","building_owner":"Украина","incomes":0,"expenses":0,"status":"Активная","self_destruction":10}],
+"landscapes":["forest","mountain"],
+"cultures":["culture_a","culture_b"],
+"religions":["religion_1"],
+"races":["race_x","race_y"],
+"climates":["temperate"],
+"resources":["wood:200000","energy:77000","stone:500000"],
+"continents":["continent_1"],
+"planets":["planet_earth"],
+"radiation_level":45,
+"pollution_level":55,
+"province_attributes":{
+"transport_infrastructure":100,
+"science_points":0,
+"religion_points":0,
+"culture_points":0,
+"energy_capacity":0,
+"gas_capacity":0,
+"liquid_capacity":0,
+"items_capacity":0
+},
+"agricultural_land_used":500,
+"agricultural_land_free":9500
+}

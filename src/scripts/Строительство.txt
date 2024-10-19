@@ -51,7 +51,7 @@ function processBuildingConstruction() {
     var warehouseValues = warehouseRange.getValues();
 
     // Загрузка статистики государства
-    var stateStatisticsRange = ss.getRangeByName('Переменные_СтатистикаГосударства');
+    var stateStatisticsRange = ss.getRangeByName('Переменные_СтроительствоСтатистика');
     var stateStatisticsValue = stateStatisticsRange.getValue();
     var stateStatisticsData = stateStatisticsValue ? JSON.parse(stateStatisticsValue) : {};
 
@@ -326,8 +326,11 @@ function processConstructionPreparation(constructionValues, constructionFormulas
           return template && template.name === buildingName;
         });
 
+        // **Изменение 2: Не выводить сообщение об ошибке, если название постройки пустое**
         if (!buildingTemplate) {
-          eventLog.push(['Строка ' + (i + 1) + ': Шаблон постройки "' + buildingName + '" не найден.', 'Ошибка']);
+          if (buildingName) { // Проверяем, что название постройки не пустое
+            eventLog.push(['Строка ' + (i + 1) + ': Шаблон постройки "' + buildingName + '" не найден.', 'Ошибка']);
+          }
           continue;
         }
 
@@ -335,6 +338,9 @@ function processConstructionPreparation(constructionValues, constructionFormulas
         var constructionCosts = buildingTemplate.construction_costs || {};
         var requiredResources = {};
         var allResourcesAvailable = true;
+
+        // Временный объект для хранения изменений складских запасов
+        var tempWarehouseChanges = {};
 
         // Для каждого ресурса в construction_costs
         for (var resourceName in constructionCosts) {
@@ -356,16 +362,20 @@ function processConstructionPreparation(constructionValues, constructionFormulas
           }
 
           var availableAmount = warehouseValues[resourceRowIndex][warehouseAccumulatedIndex];
+
+          // **Изменение: Увеличиваем спрос независимо от списания ресурсов**
+          var resourcePrice = warehouseValues[resourceRowIndex][warehousePriceIndex];
+          var demandIncrease = constructionCosts[resourceName] * quantity;
+          warehouseValues[resourceRowIndex][warehouseDemandIndex] += demandIncrease;
+
+          // Рассчитываем стоимость и добавляем в stateStatisticsData.construction_costs
+          var cost = requiredAmount * resourcePrice;
+          stateStatisticsData.construction_costs = (stateStatisticsData.construction_costs || 0) + cost;
+
           if (availableAmount >= requiredAmount) {
             // Достаточно ресурса
-            // Списываем из накопленного
-            warehouseValues[resourceRowIndex][warehouseAccumulatedIndex] -= requiredAmount;
-            // Добавляем в спрос
-            warehouseValues[resourceRowIndex][warehouseDemandIndex] += requiredAmount;
-            // Рассчитываем стоимость и добавляем в stateStatisticsData.construction_costs
-            var resourcePrice = warehouseValues[resourceRowIndex][warehousePriceIndex];
-            var cost = requiredAmount * resourcePrice;
-            stateStatisticsData.construction_costs = (stateStatisticsData.construction_costs || 0) + cost;
+            // Сохраняем изменения во временный объект
+            tempWarehouseChanges[resourceRowIndex] = (tempWarehouseChanges[resourceRowIndex] || 0) + requiredAmount;
           } else {
             // Недостаточно ресурса
             allResourcesAvailable = false;
@@ -380,7 +390,31 @@ function processConstructionPreparation(constructionValues, constructionFormulas
           }
         }
 
-        if (!allResourcesAvailable) {
+        if (allResourcesAvailable) {
+          // Все ресурсы доступны, выполняем списание
+          for (var resourceRow in tempWarehouseChanges) {
+            var amountToDeduct = tempWarehouseChanges[resourceRow];
+            warehouseValues[resourceRow][warehouseAccumulatedIndex] -= amountToDeduct;
+
+            // Добавляем спрос (уже добавлен выше)
+            // warehouseValues[resourceRow][warehouseDemandIndex] += constructionCosts[warehouseValues[resourceRow][warehouseResourceNameIndex]] * quantity;
+
+            // Рассчитываем стоимость и добавляем в stateStatisticsData.construction_costs
+            // Уже добавлено выше
+          }
+
+          // Обновляем provision статус и очищаем необходимые ресурсы
+          updatedConstructionValues[i][resourceProvisionIndex] = 'Ресурсы обеспечены';
+          updatedConstructionValues[i][requiredResourcesIndex] = '';
+
+          // Получаем required_construction_points из шаблона
+          var requiredConstructionPoints = buildingTemplate.required_construction_points || 0;
+          var totalRequiredConstructionPoints = requiredConstructionPoints * quantity;
+
+          updatedConstructionValues[i][requiredIndex] = totalRequiredConstructionPoints;
+
+        } else {
+          // Не все ресурсы доступны, не выполняем списание
           // Записываем 'Недостаточно ресурсов' в 'Обеспечение ресурсов'
           updatedConstructionValues[i][resourceProvisionIndex] = 'Недостаточно ресурсов';
           // Записываем необходимые ресурсы в 'Необходимо ресурсов'
@@ -396,16 +430,6 @@ function processConstructionPreparation(constructionValues, constructionFormulas
           eventLog.push(['Строка ' + (i + 1) + ': Недостаточно ресурсов для строительства "' + buildingName + '" в провинции "' + provinceId + '". Необходимо: ' + requiredResourcesList.join(', '), 'Ошибка']);
 
           continue;
-        } else {
-          // Все ресурсы доступны
-          updatedConstructionValues[i][resourceProvisionIndex] = 'Ресурсы обеспечены';
-          updatedConstructionValues[i][requiredResourcesIndex] = '';
-
-          // Получаем required_construction_points из шаблона
-          var requiredConstructionPoints = buildingTemplate.required_construction_points || 0;
-          var totalRequiredConstructionPoints = requiredConstructionPoints * quantity;
-
-          updatedConstructionValues[i][requiredIndex] = totalRequiredConstructionPoints;
         }
       }
     }
