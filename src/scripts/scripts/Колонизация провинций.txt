@@ -1,0 +1,280 @@
+function processColonization() {
+  var startTime = new Date();
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Получаем название государства и атрибуты
+    const stateName = ss.getRangeByName('Переменные_НазваниеГосударства').getValue();
+    const attributesRange = ss.getRangeByName('Переменные_Атрибуты');
+    const attributesJSON = attributesRange.getValue();
+    let attributesData = attributesJSON ? JSON.parse(attributesJSON) : {};
+
+    // Инициализируем атрибуты колонизации, если они отсутствуют
+    if (attributesData.colonization_points === undefined) {
+      attributesData.colonization_points = 10; // Начальные очки по умолчанию
+    }
+    if (attributesData.colonization_speed === undefined) {
+      attributesData.colonization_speed = 1; // Модификатор скорости по умолчанию
+    }
+
+    // Получаем данные провинций
+    const provincesRange = ss.getRangeByName('Провинции_ОсновнаяИнформация');
+    const provincesValues = provincesRange.getValues();
+    const provincesData = provincesValues.map(row => {
+      if (row[0]) {
+        try {
+          return JSON.parse(row[0]);
+        } catch (e) {
+          Logger.log(`Ошибка парсинга провинции: ${e}`);
+          return null;
+        }
+      } else {
+        return null;
+      }
+    });
+
+    // Получаем усилия по колонизации
+    // Предполагаем, что есть именованный диапазон 'Колонизация_Провинции', где игрок указывает провинции, очки и приоритеты
+    const colonizationRange = ss.getRangeByName('Колонизация_Колонизация');
+    const colonizationValues = colonizationRange.getValues();
+
+    // Структура: каждая строка содержит [province_id, points_allocated, priority]
+    let colonizationEfforts = colonizationValues.map(row => {
+  return {
+    province_id: String(row[0]).trim(), // Преобразуем к строке и удаляем пробелы
+    points_allocated: parseFloat(row[1]) || 0,
+    priority: parseInt(row[2]) || 0 // Чем выше число, тем выше приоритет
+  };
+});
+
+    // Инициализируем журнал событий
+    const eventLog = [];
+
+    // Выберите подход распределения: 'priority' или 'proportional'
+    const distributionMethod = 'priority'; // Или 'proportional'
+
+    if (distributionMethod === 'priority') {
+      // **Подход с приоритизацией**
+
+      // Сортируем усилия по колонизации по приоритету (от высокого к низкому)
+      colonizationEfforts.sort((a, b) => b.priority - a.priority);
+
+      let availablePoints = attributesData.colonization_points;
+
+      // Обрабатываем усилия по колонизации
+      colonizationEfforts.forEach(effort => {
+        if (availablePoints <= 0) {
+          eventLog.push([`Недостаточно колонизационных очков для провинции "${effort.province_id}". Доступные очки исчерпаны.`, 'ВНИМАНИЕ']);
+          return;
+        }
+
+        const province = provincesData.find(p => p && p.province_id === effort.province_id);
+
+        if (!province) {
+          eventLog.push([`Провинция с ID "${effort.province_id}" не найдена.`, 'Ошибка']);
+          return;
+        }
+
+        if (province.owner && province.owner !== '') {
+          eventLog.push([`Провинция "${effort.province_id}" уже принадлежит государству "${province.owner}".`, 'ВНИМАНИЕ']);
+          return;
+        }
+
+        if (province.colonization && province.colonization.state !== stateName) {
+          eventLog.push([`Провинция "${effort.province_id}" уже колонизируется государством "${province.colonization.state}".`, 'ВНИМАНИЕ']);
+          return;
+        }
+
+        let pointsToAllocate = effort.points_allocated;
+
+        // Если доступных очков меньше, чем запрошено, выделяем оставшиеся очки
+        if (availablePoints < pointsToAllocate) {
+          pointsToAllocate = availablePoints;
+          eventLog.push([`Недостаточно колонизационных очков для провинции "${effort.province_id}". Выделено ${pointsToAllocate} очков вместо ${effort.points_allocated}.`, 'ВНИМАНИЕ']);
+        }
+
+        // Списываем очки
+        availablePoints -= pointsToAllocate;
+        attributesData.colonization_points -= pointsToAllocate;
+
+        // Инициализируем данные колонизации, если отсутствуют
+        if (!province.colonization) {
+          province.colonization = {
+            state: stateName,
+            progress: 0,
+            investment: 0
+          };
+        }
+
+        // Обновляем прогресс колонизации
+        const progressIncrement = pointsToAllocate * attributesData.colonization_speed;
+        province.colonization.progress += progressIncrement;
+        province.colonization.investment += pointsToAllocate;
+
+        eventLog.push([`Колонизация провинции "${effort.province_id}" продвинулась на ${progressIncrement.toFixed(2)}%.`, 'ИНФОРМАЦИЯ']);
+
+        // Проверяем, завершена ли колонизация
+        if (province.colonization.progress >= 100) {
+          province.owner = stateName;
+          province.colonization = null; // Сбрасываем данные колонизации
+          eventLog.push([`Провинция "${effort.province_id}" успешно колонизирована государством "${stateName}".`, 'УСПЕХ']);
+        }
+      });
+    } else if (distributionMethod === 'proportional') {
+      // **Подход с пропорциональным распределением**
+
+      let totalRequestedPoints = colonizationEfforts.reduce((sum, effort) => sum + effort.points_allocated, 0);
+      let availablePoints = attributesData.colonization_points;
+
+      if (totalRequestedPoints > availablePoints) {
+        let distributionCoefficient = availablePoints / totalRequestedPoints;
+        eventLog.push([`Недостаточно колонизационных очков. Запрошено ${totalRequestedPoints}, доступно ${availablePoints}. Очки будут распределены пропорционально.`, 'ВНИМАНИЕ']);
+
+        colonizationEfforts.forEach(effort => {
+          const province = provincesData.find(p => p && p.province_id === effort.province_id);
+
+          if (!province) {
+            eventLog.push([`Провинция с ID "${effort.province_id}" не найдена.`, 'Ошибка']);
+            return;
+          }
+
+          if (province.owner && province.owner !== '') {
+            eventLog.push([`Провинция "${effort.province_id}" уже принадлежит государству "${province.owner}".`, 'ВНИМАНИЕ']);
+            return;
+          }
+
+          if (province.colonization && province.colonization.state !== stateName) {
+            eventLog.push([`Провинция "${effort.province_id}" уже колонизируется государством "${province.colonization.state}".`, 'ВНИМАНИЕ']);
+            return;
+          }
+
+          let pointsToAllocate = effort.points_allocated * distributionCoefficient;
+          pointsToAllocate = Math.floor(pointsToAllocate * 100) / 100; // Округляем до сотых
+
+          // Списываем очки
+          attributesData.colonization_points -= pointsToAllocate;
+          availablePoints -= pointsToAllocate;
+
+          // Инициализируем данные колонизации, если отсутствуют
+          if (!province.colonization) {
+            province.colonization = {
+              state: stateName,
+              progress: 0,
+              investment: 0
+            };
+          }
+
+          // Обновляем прогресс колонизации
+          const progressIncrement = pointsToAllocate * attributesData.colonization_speed;
+          province.colonization.progress += progressIncrement;
+          province.colonization.investment += pointsToAllocate;
+
+          eventLog.push([`Колонизация провинции "${effort.province_id}" продвинулась на ${progressIncrement.toFixed(2)}% (выделено ${pointsToAllocate} очков).`, 'ИНФОРМАЦИЯ']);
+
+          // Проверяем, завершена ли колонизация
+          if (province.colonization.progress >= 100) {
+            province.owner = stateName;
+            province.colonization = null; // Сбрасываем данные колонизации
+            eventLog.push([`Провинция "${effort.province_id}" успешно колонизирована государством "${stateName}".`, 'УСПЕХ']);
+          }
+        });
+      } else {
+        // Если очков хватает, просто выполняем обычную обработку
+        colonizationEfforts.forEach(effort => {
+          const province = provincesData.find(p => p && p.province_id === effort.province_id);
+
+          if (!province) {
+            eventLog.push([`Провинция с ID "${effort.province_id}" не найдена.`, 'Ошибка']);
+            return;
+          }
+
+          if (province.owner && province.owner !== '') {
+            eventLog.push([`Провинция "${effort.province_id}" уже принадлежит государству "${province.owner}".`, 'ВНИМАНИЕ']);
+            return;
+          }
+
+          if (province.colonization && province.colonization.state !== stateName) {
+            eventLog.push([`Провинция "${effort.province_id}" уже колонизируется государством "${province.colonization.state}".`, 'ВНИМАНИЕ']);
+            return;
+          }
+
+          let pointsToAllocate = effort.points_allocated;
+
+          // Списываем очки
+          attributesData.colonization_points -= pointsToAllocate;
+
+          // Инициализируем данные колонизации, если отсутствуют
+          if (!province.colonization) {
+            province.colonization = {
+              state: stateName,
+              progress: 0,
+              investment: 0
+            };
+          }
+
+          // Обновляем прогресс колонизации
+          const progressIncrement = pointsToAllocate * attributesData.colonization_speed;
+          province.colonization.progress += progressIncrement;
+          province.colonization.investment += pointsToAllocate;
+
+          eventLog.push([`Колонизация провинции "${effort.province_id}" продвинулась на ${progressIncrement.toFixed(2)}%.`, 'ИНФОРМАЦИЯ']);
+
+          // Проверяем, завершена ли колонизация
+          if (province.colonization.progress >= 100) {
+            province.owner = stateName;
+            province.colonization = null; // Сбрасываем данные колонизации
+            eventLog.push([`Провинция "${effort.province_id}" успешно колонизирована государством "${stateName}".`, 'УСПЕХ']);
+          }
+        });
+      }
+    }
+
+    // Применяем события колонизации (опционально)
+    applyColonizationEvents(provincesData, stateName, eventLog);
+
+    // Обновляем данные провинций
+    const updatedProvincesValues = provincesData.map(province => {
+      if (province) {
+        return [JSON.stringify(province)];
+      } else {
+        return [''];
+      }
+    });
+    provincesRange.setValues(updatedProvincesValues);
+	
+    // Обновляем атрибуты государства
+    attributesRange.setValue(JSON.stringify(attributesData));
+
+    // Очищаем усилия по колонизации для следующего хода
+    colonizationRange.clearContent();
+
+    // Записываем журнал событий
+    if (eventLog.length > 0) {
+      const eventLogSheet = ss.getSheetByName('Журнал событий');
+      const lastRow = eventLogSheet.getLastRow();
+      eventLogSheet.getRange(lastRow + 1, 1, eventLog.length, 2).setValues(eventLog);
+    }
+
+    logResult("processColonization", "", (new Date() - startTime) / 1000, "Успешно");
+  } catch (e) {
+    logResult("processColonization", e.toString(), (new Date() - startTime) / 1000, "Ошибка");
+  }
+}
+
+// Функция для обработки случайных событий колонизации
+function applyColonizationEvents(provincesData, stateName, eventLog) {
+  provincesData.forEach(province => {
+    if (province && province.colonization && province.colonization.state === stateName) {
+      // Случайная вероятность события
+      const eventChance = Math.random();
+      if (eventChance < 0.1) { // 10% вероятность события
+        // Пример события: Вспышка болезни замедляет прогресс
+        const progressPenalty = 5; // Снижаем прогресс на 5%
+        province.colonization.progress -= progressPenalty;
+        province.colonization.progress = Math.max(province.colonization.progress, 0); // Убеждаемся, что прогресс не отрицательный
+
+        eventLog.push([`В провинции "${province.province_id}" вспышка болезни замедлила колонизацию на ${progressPenalty}%.`, 'СОБЫТИЕ']);
+      }
+    }
+  });
+}
