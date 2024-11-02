@@ -1214,17 +1214,6 @@ function enforceProvinceAttributeLimits(provincesData, stateName) {
         eventLog.push([provinceMessages.join(' '), 'ВНИМАНИЕ']);
       }
     });
-
-    // Шаг 3: Запись сообщений в журнал событий
-    if (eventLog.length > 0) {
-      const eventLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Журнал событий');
-      if (eventLogSheet) {
-        const lastRow = eventLogSheet.getLastRow();
-        eventLogSheet.getRange(lastRow + 1, 1, eventLog.length, 2).setValues(eventLog);
-      } else {
-        Logger.log('Лист "Журнал событий" не найден.');
-      }
-    }
 }
 
 /**
@@ -1295,17 +1284,6 @@ function enforceStateAttributeLimits(attributesData) {
             eventLog.push([formattedMessage, 'ВНИМАНИЕ']);
           }
         }
-      }
-    }
-
-    // Шаг 3: Запись сообщений в журнал событий
-    if (eventLog.length > 0) {
-      const eventLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Журнал событий');
-      if (eventLogSheet) {
-        const lastRow = eventLogSheet.getLastRow();
-        eventLogSheet.getRange(lastRow + 1, 1, eventLog.length, 2).setValues(eventLog);
-      } else {
-        Logger.log('Лист "Журнал событий" не найден.');
       }
     }
 }
