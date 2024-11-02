@@ -42,15 +42,15 @@ function processProvincesAndBuildings() {
     // Применение лимитов построек на уровне государства и провинций
     enforceBuildingLimits(buildingTemplatesMap, targetProvinces, stateName, eventLog);
     enforceProvinceBuildingLimits(buildingTemplatesMap, provincesData, stateName, eventLog);
-
-    // Обновление складов и записей в таблицу
-    updateSpreadsheet(ss, provincesData, resourceStock, resourceSupplyTotal, resourceDemand, eventLog, stateMetrics);
-
-    // Ограничение атрибутов государства
+	
+	// Ограничение атрибутов государства
     enforceStateAttributeLimits(attributesData, eventLog);
 
     // Запись обновленных атрибутов
     attributesRange.setValue(JSON.stringify(attributesData));
+
+    // Обновление складов и записей в таблицу
+    updateSpreadsheet(ss, provincesData, resourceStock, resourceSupplyTotal, resourceDemand, eventLog, stateMetrics);
 
     logResult("processProvincesAndBuildings", "", (new Date() - startTime) / 1000, "Успешно");
   } catch (e) {
@@ -58,11 +58,7 @@ function processProvincesAndBuildings() {
   }
 }
 
-/**
- * Инициализация данных государства.
- * @param {SpreadsheetApp.Spreadsheet} ss - Активная таблица.
- * @returns {Object} - Объект с данными государства.
- */
+// Инициализация данных государства.
 function initializeStateData(ss) {
   const stateName = ss.getRangeByName('Переменные_НазваниеГосударства').getValue();
   const stateModifiersJSON = ss.getRangeByName('Переменные_МодификаторыГосударства').getValue();
@@ -108,11 +104,7 @@ function initializeStateData(ss) {
   return { stateName, stateData, stateMetrics, workersCoefficient, averageSalary, corporateTax };
 }
 
-/**
- * Чтение данных провинций.
- * @param {SpreadsheetApp.Spreadsheet} ss - Активная таблица.
- * @returns {Array} - Массив данных провинций.
- */
+// Чтение данных провинций.
 function readProvincesData(ss) {
   const provincesRange = ss.getRangeByName('Провинции_ОсновнаяИнформация');
   const provincesValues = provincesRange.getValues();
@@ -131,11 +123,7 @@ function readProvincesData(ss) {
   return provincesData;
 }
 
-/**
- * Чтение данных ресурсов.
- * @param {SpreadsheetApp.Spreadsheet} ss - Активная таблица.
- * @returns {Object} - Объект с данными ресурсов.
- */
+// Чтение данных ресурсов.
 function readResourcesData(ss) {
   const resourceListRange = ss.getRangeByName('СкладТоваров_СписокРесурсов');
   const resourceList = resourceListRange.getValues().flat();
@@ -160,13 +148,8 @@ function readResourcesData(ss) {
 function resetStateAttributes(attributesData) {
   const stateAttributesResetMap = {
     'science_points': true,
-    'religion_points': true,
-    'culture_points': true,
-    'energy_capacity': true,
-    'gas_capacity': true,
-    'liquid_capacity': true,
-    'items_capacity': true,
-	'state_loyalty': false
+    'religion_points': false,
+    'culture_points': false
     // Добавьте другие атрибуты по необходимости
   };
 
@@ -177,20 +160,7 @@ function resetStateAttributes(attributesData) {
   }
 }
 
-/**
- * Обработка одной провинции.
- * @param {Object} province - Объект провинции.
- * @param {string} stateName - Название текущего государства.
- * @param {Object} stateData - Данные государства.
- * @param {Object} stateMetrics - Объект метрик государства.
- * @param {Object} buildingTemplatesMap - Карта шаблонов построек.
- * @param {Object} resourceIndexMap - Карта индексов ресурсов.
- * @param {Array} resourceStock - Текущие запасы ресурсов.
- * @param {Array} resourcePrices - Цены на ресурсы.
- * @param {number} averageSalary - Средняя зарплата.
- * @param {number} corporateTax - Ставка корпоративного налога.
- * @param {Array} eventLog - Массив для записи сообщений в журнал событий.
- */
+// Обработка одной провинции.
 function processProvince(province, stateName, stateData, stateMetrics, buildingTemplatesMap, resourceIndexMap, resourceStock, resourcePrices, averageSalary, corporateTax, eventLog, attributesData, resourceDemand, resourceSupplyTotal) {
   // Локальные переменные и инициализация
   let provinceMessages = [];
@@ -214,7 +184,7 @@ function processProvince(province, stateName, stateData, stateMetrics, buildingT
       const buildingTemplate = buildingTemplatesMap[building.name];
       if (!buildingTemplate) {
       building.status = 'Неактивная'; // Устанавливаем статус "Неактивная" для построек без шаблона
-      eventLog.push([`Шаблон для постройки "${building.name}" в провинции "${province.province_id}" не найден. Постройка установлена в "Неактивная".`, 'ВНИМАНИЕ']);
+      eventLog.push([`Шаблон для постройки "${building.name}" в провинции "${province.province_id}" не найден. Постройка получила статус "Неактивная" и будет снесена через некоторое количество ходов.`, 'Сообщить Администрации']);
       return; // Прерываем обработку этой постройки
       }
 
@@ -234,7 +204,7 @@ function processProvince(province, stateName, stateData, stateMetrics, buildingT
       const requiredAgriculturalLand = buildingTemplate.required_agricultural_land || 0;
       if (freeAgriculturalLand < requiredAgriculturalLand) {
         building.status = 'Неактивная';
-        provinceMessages.push(`Недостаточно агрокультурных земель для постройки "${building.name}" в провинции "${province.province_id}". Необходимо ${requiredAgriculturalLand}, доступно ${freeAgriculturalLand}`);
+        provinceMessages.push(`Недостаточно агрокультурных земель для постройки "${building.name}" в провинции "${province.province_id}". Необходимо ${requiredAgriculturalLand}, доступно ${freeAgriculturalLand}. Постройка получит статус "Неактивная".`);
         return;
       }
       usedAgriculturalLand += requiredAgriculturalLand;
@@ -279,10 +249,11 @@ function processProvince(province, stateName, stateData, stateMetrics, buildingT
 
   // Логирование сообщений
   if (provinceMessages.length > 0) {
-    eventLog.push([`Провинция "${province.province_id}": ${provinceMessages.join('; ')}`, 'ВНИМАНИЕ']);
+    eventLog.push([`Провинция "${province.province_id}": ${provinceMessages.join('; ')}`, 'Уведомление']);
   }
 }
 
+// Обработка других провинций
 function processOtherProvinces(otherProvinces, stateName, stateMetrics, eventLog) {
   otherProvinces.forEach(province => {
     if (!province) return;
@@ -298,16 +269,7 @@ function processOtherProvinces(otherProvinces, stateName, stateMetrics, eventLog
   });
 }
 
-/**
- * Обновление данных в таблице и журнале событий.
- * @param {SpreadsheetApp.Spreadsheet} ss - Активная таблица.
- * @param {Array} provincesData - Массив данных провинций.
- * @param {Array} resourceStock - Текущие запасы ресурсов.
- * @param {Array} resourceSupplyTotal - Текущие предложения ресурсов.
- * @param {Array} resourceDemand - Текущий спрос на ресурсы.
- * @param {Array} eventLog - Массив для записи сообщений в журнал событий.
- * @param {Object} stateMetrics - Объект метрик государства.
- */
+// Обновление данных в таблице и журнале событий.
 function updateSpreadsheet(ss, provincesData, resourceStock, resourceSupplyTotal, resourceDemand, eventLog, stateMetrics) {
   // Обновление складов ресурсов
   const resourceStockRange = ss.getRangeByName('СкладТоваров_Накоплено');
@@ -340,26 +302,14 @@ function updateSpreadsheet(ss, provincesData, resourceStock, resourceSupplyTotal
   ss.getRangeByName('Переменные_СтатистикаГосударства').setValue(stateMetricsJSON);
 }
 
-/**
- * Сброс доходов и расходов постройки.
- * @param {Object} building - Объект постройки.
- */
+// Сброс доходов и расходов постройки.
 function resetBuilding(building) {
   building.expenses = 0;
   building.incomes = 0;
   building.status = 'Активная';
 }
 
-/**
- * Проверка соответствия критериев постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {Object} province - Объект провинции.
- * @param {Object} stateData - Данные государства.
- * @param {string} stateName - Название государства.
- * @param {Object} building - Объект постройки.
- * @param {Array} provinceMessages - Массив сообщений для провинции.
- * @returns {boolean} - Возвращает true, если критерии выполнены, иначе false.
- */
+// Проверка соответствия критериев постройки.
 function checkBuildingCriteria(buildingTemplate, province, stateData, stateName, building, provinceMessages, attributesData) {
   // Проверка критериев провинции
   const provinceCriteriaMet = checkCriteria(buildingTemplate, province, 'province');
@@ -391,16 +341,7 @@ function checkBuildingCriteria(buildingTemplate, province, stateData, stateName,
   return true;
 }
 
-/**
- * Назначение рабочих для постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {Object} province - Объект провинции.
- * @param {Object} stateMetrics - Объект метрик государства.
- * @param {number} averageSalary - Средняя зарплата.
- * @param {Object} building - Объект постройки.
- * @param {Array} provinceMessages - Массив сообщений для провинции.
- * @returns {boolean} - Возвращает true, если рабочие назначены успешно, иначе false.
- */
+// Назначение рабочих для постройки.
 function assignWorkers(buildingTemplate, province, stateMetrics, averageSalary, building, provinceMessages) {
   const requiredWorkers = buildingTemplate.required_workers || 0;
   const freeWorkers = province.available_workers - province.occupied_workers;
@@ -413,26 +354,18 @@ function assignWorkers(buildingTemplate, province, stateMetrics, averageSalary, 
     return true;
   } else {
     building.status = 'Неактивная';
-    provinceMessages.push(`Не хватает рабочей силы для постройки "${building.name}" в провинции "${province.province_id}". Необходимо ${requiredWorkers}, доступно ${freeWorkers}`);
+    provinceMessages.push(`Не хватает рабочей силы для постройки "${building.name}" в провинции "${province.province_id}". Необходимо ${requiredWorkers}, доступно ${freeWorkers}. Постройка получит статус "Неактивная".`);
     return false;
   }
 }
 
-/**
- * Назначение агрокультурных земель для постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {number} freeAgriculturalLand - Свободные агрокультурные земли.
- * @param {number} usedAgriculturalLand - Использованные агрокультурные земли.
- * @param {Object} building - Объект постройки.
- * @param {Array} provinceMessages - Массив сообщений для провинции.
- * @returns {boolean} - Возвращает true, если земли назначены успешно, иначе false.
- */
+// Назначение агрокультурных земель для постройки.
 function assignAgriculturalLand(buildingTemplate, freeAgriculturalLand, usedAgriculturalLand, building, provinceMessages) {
   const requiredAgriculturalLand = buildingTemplate.required_agricultural_land || 0;
 
   if (freeAgriculturalLand < requiredAgriculturalLand) {
     building.status = 'Неактивная';
-    provinceMessages.push(`Недостаточно агрокультурных земель для постройки "${building.name}" в провинции "${building.province_id}". Необходимо ${requiredAgriculturalLand}, доступно ${freeAgriculturalLand}`);
+    provinceMessages.push(`Недостаточно агрокультурных земель для постройки "${building.name}" в провинции "${building.province_id}". Необходимо ${requiredAgriculturalLand}, доступно ${freeAgriculturalLand}. Постройка получит статус "Неактивная".`);
     return false;
   }
 
@@ -441,18 +374,7 @@ function assignAgriculturalLand(buildingTemplate, freeAgriculturalLand, usedAgri
   return true;
 }
 
-/**
- * Обработка потребления ресурсов зданием.
- * @param {Object} building - Объект постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {Object} province - Объект провинции.
- * @param {Object} resourceIndexMap - Карта индексов ресурсов.
- * @param {Array} resourceStock - Текущие запасы ресурсов.
- * @param {Array} resourcePrices - Цены на ресурсы.
- * @param {number} consumptionEfficiency - Коэффициент потребления.
- * @param {Array} provinceMessages - Массив сообщений для провинции.
- * @returns {boolean} - Возвращает true, если потребление ресурсов успешно, иначе false.
- */
+// Обработка потребления ресурсов зданием.
 function processBuildingResources(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, consumptionEfficiency, provinceMessages, resourceDemand, resourceSupplyTotal) {
   const consumption = buildingTemplate.consumption || {};
   let consumptionPossible = true;
@@ -486,16 +408,7 @@ function processBuildingResources(building, buildingTemplate, province, resource
   }
 }
 
-/**
- * Обработка производства ресурсов зданием.
- * @param {Object} building - Объект постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {Object} resourceIndexMap - Карта индексов ресурсов.
- * @param {Array} resourceStock - Текущие запасы ресурсов.
- * @param {Object} stateMetrics - Объект метрик государства.
- * @param {Array} resourcePrices - Цены на ресурсы.
- * @param {number} productionEfficiency - Коэффициент производства.
- */
+// Обработка производства ресурсов зданием.
 function processResourceProduction(building, buildingTemplate, resourceIndexMap, resourceStock, stateMetrics, resourcePrices, productionEfficiency, resourceDemand, resourceSupplyTotal) {
   const production = buildingTemplate.production || {};
   let productionIncome = 0;
@@ -514,13 +427,7 @@ function processResourceProduction(building, buildingTemplate, resourceIndexMap,
   return;
 }
 
-/**
- * Обработка корпоративного налога.
- * @param {Object} building - Объект постройки.
- * @param {string} stateName - Название государства.
- * @param {number} corporateTax - Ставка корпоративного налога.
- * @param {Object} stateMetrics - Объект метрик государства.
- */
+// Обработка корпоративного налога.
 function processCorporateTax(building, stateName, corporateTax, stateMetrics) {
   if (building.building_owner !== stateName && building.status === 'Активная') {
     const taxAmount = building.incomes * corporateTax;
@@ -530,13 +437,7 @@ function processCorporateTax(building, stateName, corporateTax, stateMetrics) {
   }
 }
 
-/**
- * Обновление атрибутов на основе активных построек.
- * @param {Object} building - Объект постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {Object} provinceAttributes - Объект атрибутов провинции.
- * @param {Object} stateAttributes - Объект атрибутов государства.
- */
+// Обновление атрибутов на основе активных построек.
 function updateAttributes(building, buildingTemplate, provinceAttributes, stateAttributes) {
   // Обработка атрибутов активной постройки для провинции
   if (building.status === 'Активная' && buildingTemplate.province_attributes) {
@@ -567,11 +468,7 @@ function updateAttributes(building, buildingTemplate, provinceAttributes, stateA
   }
 }
 
-/**
- * Обработка самоуничтожения построек.
- * @param {Object} province - Объект провинции.
- * @param {Array} eventLog - Массив для записи сообщений в журнал событий.
- */
+// Обработка самоуничтожения построек.
 function handleSelfDestruction(province, eventLog) {
   if (province.buildings && province.buildings.length > 0) {
     // Используем копию массива зданий для безопасного удаления элементов во время итерации
@@ -582,18 +479,7 @@ function handleSelfDestruction(province, eventLog) {
   }
 }
 
-/**
- * Функция обработки resource_extraction для активной постройки
- * @param {Object} building - Объект постройки
- * @param {Object} buildingTemplate - Шаблон постройки
- * @param {Object} province - Объект провинции
- * @param {Object} resourceIndexMap - Карта индексов ресурсов
- * @param {Array} resourceStock - Текущие запасы ресурсов
- * @param {Array} resourceSupplyTotal - Текущие предложения ресурсов
- * @param {Array} resourcePrices - Цены на ресурсы
- * @param {number} extractionCoefficient - Глобальный коэффициент добычи
- * @param {Array} provinceMessages - Локальный массив сообщений для провинции
- */
+// Функция обработки добычи ресурсов для активной постройки
 function processResourceExtraction(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, extractionCoefficient, provinceMessages, resourceDemand, resourceSupplyTotal) {
   const resourceExtraction = buildingTemplate.resource_extraction;
 
@@ -630,7 +516,7 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
         resourceStock[stockIndex] += extractionAmount;
       } else {
         // Ресурс не найден в списке ресурсов склада
-        provinceMessages.push(`Ресурс "${resName}" не найден в складе.`);
+        provinceMessages.push(`Тип ресурса "${resName}" не найден в складе.`);
         continue;
       }
 
@@ -657,7 +543,7 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
         resourceSupplyTotal[stockIndex] += resQuantity;
       } else {
         // Ресурс не найден в списке ресурсов склада
-        provinceMessages.push(`Ресурс "${resName}" не найден в складе.`);
+        provinceMessages.push(`Тип ресурса "${resName}" не найден в складе.`);
       }
       // Добавляем доход от добычи остатка
       const resourcePrice = resourcePrices[stockIndex] || 0;
@@ -678,11 +564,7 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
   province.resources = provinceResources;
 }
 
-/**
- * Функция проверки и ограничения значений атрибутов провинций.
- * @param {Array} provincesData - Массив данных провинций
- * @param {string} stateName - Название государства (чтобы корректировать атрибуты только своих провинций)
- */
+// Функция проверки и ограничения значений атрибутов провинций.
 function enforceProvinceAttributeLimits(provincesData, stateName, eventLog) {
     // Шаг 1: Определение лимитов атрибутов провинций
     const attributeLimits = {
@@ -690,7 +572,7 @@ function enforceProvinceAttributeLimits(provincesData, stateName, eventLog) {
         hasLimit: true,
         min: 0,
         max: 100,
-        log: true,
+        log: false, // Параметр отвечающий за вывод сообщения в журнал событий
         message: 'Провинция "{province_id}": Атрибут "{attribute}" скорректирован с {oldValue} до {newValue} из-за нарушения ограничения.'
       }
       // Добавьте другие атрибуты по необходимости
@@ -747,38 +629,35 @@ function enforceProvinceAttributeLimits(provincesData, stateName, eventLog) {
       }
 
       if (attributesChanged && provinceMessages.length > 0) {
-        eventLog.push([provinceMessages.join(' '), 'ВНИМАНИЕ']);
+        eventLog.push([provinceMessages.join(' '), 'Уведомление']);
       }
     });
 }
 
-/**
- * Функция проверки и ограничения значений атрибутов государства.
- * @param {Object} attributesData - Объект данных атрибутов государства
- */
+// Функция проверки и ограничения значений атрибутов государства.
 function enforceStateAttributeLimits(attributesData, eventLog) {
     // Шаг 1: Определение лимитов атрибутов государства
     const stateAttributeLimits = {
       "science_points": {
         hasLimit: true,
         min: 0,
-        max: 100,
-        log: true,
-        message: 'Атрибут "{attribute}" был корректирован с {oldValue} на {newValue} из-за превышения лимита накопления.'
+        max: 10000,
+        log: true, // Параметр отвечающий за вывод сообщения в журнал событий
+        message: 'Количество очков науки({attribute}) было изменено с {oldValue} на {newValue} из-за нарушения лимита накопления.'
       },
       "culture_points": {
         hasLimit: true,
         min: 0,
-        max: 150,
+        max: 10000,
         log: true,
-        message: 'Атрибут "{attribute}" был корректирован с {oldValue} на {newValue} из-за превышения лимита накопления.'
+        message: 'Количество очков культуры({attribute}) было изменено с {oldValue} на {newValue} из-за нарушения лимита накопления.'
       },
-      "energy_capacity": {
+      "religion_points": {
         hasLimit: true,
         min: 0,
-        max: 500,
+        max: 10000,
         log: true,
-        message: 'Атрибут "{attribute}" установлен в пределах допустимого диапазона от {oldValue} до {newValue}.'
+        message: 'Количество очков религии({attribute}) было изменено с {oldValue} на {newValue} из-за нарушения лимита накопления.'
       }
       // Добавьте другие атрибуты по необходимости
     };
@@ -822,13 +701,7 @@ function enforceStateAttributeLimits(attributesData, eventLog) {
     }
 }
 
-/**
- * Функция проверки и применения лимитов построек.
- * @param {Object} buildingTemplatesMap - Карта шаблонов построек.
- * @param {Array} targetProvinces - Массив провинций, принадлежащих государству.
- * @param {string} stateName - Название текущего государства.
- * @param {Array} eventLog - Массив для записи сообщений в журнал событий.
- */
+// Функция проверки и применения лимитов построек.
 function enforceBuildingLimits(buildingTemplatesMap, targetProvinces, stateName, eventLog) {
   for (const buildingName in buildingTemplatesMap) {
     const template = buildingTemplatesMap[buildingName];
@@ -874,13 +747,7 @@ function enforceBuildingLimits(buildingTemplatesMap, targetProvinces, stateName,
   }
 }
 
-/**
- * Функция проверки и применения лимитов построек для каждой провинции.
- * @param {Object} buildingTemplatesMap - Карта шаблонов построек.
- * @param {Array} provincesData - Массив данных провинций.
- * @param {string} stateName - Название текущего государства.
- * @param {Array} eventLog - Массив для записи сообщений в журнал событий.
- */
+// Функция проверки и применения лимитов построек для каждой провинции.
 function enforceProvinceBuildingLimits(buildingTemplatesMap, provincesData, stateName, eventLog) {
   provincesData.forEach(province => {
     if (!province || province.owner !== stateName || !province.buildings) return;
@@ -920,11 +787,7 @@ function enforceProvinceBuildingLimits(buildingTemplatesMap, provincesData, stat
   });
 }
 
-/**
- * Чтение шаблонов построек.
- * @param {SpreadsheetApp.Spreadsheet} ss - Активная таблица.
- * @returns {Object} - Карта шаблонов построек.
- */
+// Чтение шаблонов построек.
 function readBuildingTemplates(ss) {
   const buildingTemplatesRange = ss.getRangeByName('Постройки_Шаблоны');
   const buildingTemplatesValues = buildingTemplatesRange.getValues();
@@ -950,11 +813,7 @@ function readBuildingTemplates(ss) {
   return buildingTemplatesMap;
 }
 
-/**
- * Функция для чтения данных из именованного диапазона, который может содержать несколько ячеек
- * @param {string} rangeName - Название диапазона
- * @returns {Array} - Массив данных
- */
+// Функция для чтения данных из именованного диапазона, который может содержать несколько ячеек
 function readDataFromRange(rangeName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const range = ss.getRangeByName(rangeName);
@@ -991,11 +850,7 @@ function readDataFromRange(rangeName) {
   return result;
 }
 
-/**
- * Чтение изученных технологий
- * @param {string} rangeName - Название диапазона
- * @returns {Array} - Массив изученных технологий
- */
+// Чтение изученных технологий
 function readStateTechnologiesGeneral(rangeName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const range = ss.getRangeByName(rangeName);
@@ -1029,11 +884,7 @@ function readStateTechnologiesGeneral(rangeName) {
   return result;
 }
 
-/**
- * Чтение принятых законов
- * @param {string} rangeName - Название диапазона
- * @returns {Array} - Массив принятых законов
- */
+// Чтение принятых законов
 function readStateLawsGeneral(rangeName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const range = ss.getRangeByName(rangeName);
@@ -1067,10 +918,7 @@ function readStateLawsGeneral(rangeName) {
   return result;
 }
 
-/**
- * Сброс определённых атрибутов провинции.
- * @param {Object} provinceAttributes - Объект атрибутов провинции.
- */
+// Сброс определённых атрибутов провинции.
 function resetProvinceAttributes(provinceAttributes) {
   const provinceAttributesResetMap = {
     'transport_infrastructure': true,
@@ -1084,6 +932,7 @@ function resetProvinceAttributes(provinceAttributes) {
   }
 }
 
+// Применение модификаторов к зданиям
 function applyBuildingModifiers(buildingTemplate, stateModifiers) {
   const appliedModifiers = {
     productionEfficiency: 0,
@@ -1120,12 +969,7 @@ function applyBuildingModifiers(buildingTemplate, stateModifiers) {
   return appliedModifiers;
 }
 
-/**
- * Функция для суммирования модификаторов
- * @param {Array} modifiersArray - Массив модификаторов из шаблона постройки
- * @param {Object} stateModifiers - Объект с модификаторами государства
- * @returns {number} - Суммированное значение модификаторов
- */
+// Функция для суммирования модификаторов
 function getSummedModifiers(modifiersArray, stateModifiers) {
   let summedModifier = 0;
 
@@ -1139,13 +983,7 @@ function getSummedModifiers(modifiersArray, stateModifiers) {
   return summedModifier;
 }
 
-/**
- * Функция проверки критериев
- * @param {Object} template - Шаблон постройки
- * @param {Object} dataObject - Объект данных (провинция или государство)
- * @param {string} type - Тип данных ('province' или 'state')
- * @returns {Object} - Результат проверки
- */
+// Функция проверки критериев
 function checkCriteria(template, dataObject, type) {
   const criteriaList = getCriteriaList(type);
   let allSuccess = true;
@@ -1194,11 +1032,7 @@ function checkCriteria(template, dataObject, type) {
   }
 }
 
-/**
- * Получение списка критериев в зависимости от типа данных
- * @param {string} type - Тип данных ('province' или 'state')
- * @returns {Array} - Список критериев
- */
+// Получение списка критериев в зависимости от типа данных
 function getCriteriaList(type) {
   if (type === 'province') {
     return [
@@ -1227,13 +1061,7 @@ function getCriteriaList(type) {
   return [];
 }
 
-/**
- * Оценка условия для критериев
- * @param {any} condition - Условие для оценки
- * @param {any} dataValue - Значение данных
- * @param {string} dataType - Тип данных ('text' или 'number')
- * @returns {Object} - Результат оценки
- */
+// Оценка условия для критериев
 function evaluateCondition(condition, dataValue, dataType) {
   if (typeof condition === 'object' && !Array.isArray(condition)) {
     for (const operator in condition) {
@@ -1366,11 +1194,7 @@ function evaluateCondition(condition, dataValue, dataType) {
   return { success: true };
 }
 
-/**
- * Описание условия для логирования
- * @param {Object} condition - Условие
- * @returns {string} - Описание условия
- */
+// Описание условия для логирования
 function describeConditionProvince(condition) {
   if (typeof condition === 'string') {
     return `"${condition}"`;
@@ -1417,13 +1241,7 @@ function describeConditionProvince(condition) {
   return 'неизвестное условие';
 }
 
-/**
- * Функция проверки соответствия атрибутов провинции и государства требованиям постройки.
- * @param {Object} buildingTemplate - Шаблон постройки.
- * @param {Object} province - Объект провинции.
- * @param {Object} stateAttributes - Объект атрибутов государства.
- * @returns {Object} - Результат проверки с полем success и списком причин.
- */
+// Функция проверки соответствия атрибутов провинции и государства требованиям постройки.
 function checkBuildingAttributeRequirements(buildingTemplate, province, stateAttributes) {
   let allSuccess = true;
   let reasons = [];
@@ -1468,6 +1286,7 @@ function checkBuildingAttributeRequirements(buildingTemplate, province, stateAtt
   };
 }
 
+// Обработка самоуничтожения построек
 function processSelfDestruction(building, province, eventLog) {
   if (!building.hasOwnProperty('self_destruction')) {
     // Если ключ отсутствует, инициализируем его значением 10
@@ -1481,8 +1300,8 @@ function processSelfDestruction(building, province, eventLog) {
 
     if (building.self_destruction <= 3 && building.self_destruction > 0) {
       eventLog.push([
-        `Здание "${building.name}" в провинции "${province.province_id}" будет снесено через ${building.self_destruction} циклов по причине длительной неактивности.`,
-        'ВНИМАНИЕ'
+        `Здание "${building.name}" в провинции "${province.province_id}" будет снесено через ${building.self_destruction} ходов по причине длительной неактивности.`,
+        'Уведомление'
       ]);
     }
 
@@ -1493,18 +1312,14 @@ function processSelfDestruction(building, province, eventLog) {
         province.buildings.splice(buildingIndex, 1);
         eventLog.push([
           `Здание "${building.name}" в провинции "${province.province_id}" было снесено из-за длительной неактивности.`,
-          'ИНФОРМАЦИЯ'
+          'Уведомление'
         ]);
       }
     }
   }
 }
 
-/**
- * Форматирование значения данных для логирования
- * @param {any} dataValue - Значение данных
- * @returns {string} - Отформатированное значение
- */
+// Форматирование значения данных для логирования
 function formatDataValue(dataValue) {
   if (Array.isArray(dataValue)) {
     return `[${dataValue.join(', ')}]`;
