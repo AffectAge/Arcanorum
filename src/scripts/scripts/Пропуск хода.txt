@@ -1,0 +1,51 @@
+function nextTurn() {
+  // Получение доступа к пользовательскому интерфейсу текущего приложения
+  var ui = SpreadsheetApp.getUi();
+  
+  // Переход на лист "Логи"
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Логи');
+  if (sheet) {
+    sheet.activate(); // Активируем лист "Логи"
+  } else {
+    ui.alert('Ошибка', 'Лист "Логи" не найден.', ui.ButtonSet.OK);
+    return;
+  }
+  
+  // Уведомление перед началом выполнения функций
+  ui.alert('Пожалуйста, подождите', 'Выполняется пропуск хода. Это может занять некоторое время, ничего не трогайте:).', ui.ButtonSet.OK);
+
+  // Создание массива функций с указанием приоритета
+  // Чем меньше число приоритета, тем быстрее будет выполнен скрипт
+  // Соблюдение порядка выполнения скриптов КРИТИЧНО для корректного функционаривания
+  // 1-100000 Импорт данных
+  var functions = [
+    // Утилиты которые должны запускаться первыми
+    {name: 'clearLogs', priority: 1000, func: clearLogs}, // Очистка логов перед записью новых
+
+    // Импорт и обработка данных которые используються другими скриптами
+    {name: 'importGeneralTemplates', priority: 10000, func: importGeneralTemplates}, // Импорт шаблонов построек, законов, технологий и так далее
+    {name: 'exportProvincesInfo', priority: 10100, func: exportProvincesInfo}, // Экспорт обновленных данных провинций
+    {name: 'importNamedRangesInfo', priority: 10200, func: importNamedRangesInfo}, // Импорт именных диапазонов, с ними работают другие скрипты
+    
+    // Основные скрипты
+    {name: 'processProvincesAndBuildings', priority: 200000, func: processProvincesAndBuildings}, // Обработка зданий
+  ];
+
+  // Сортировка функций по приоритету
+  functions.sort(function(a, b) {
+    return a.priority - b.priority;
+  });
+
+  // Выполнение функций в порядке их приоритета
+  for (var i = 0; i < functions.length; i++) {
+    var func = functions[i].func;
+    if (typeof func === 'function') {
+      func();
+    } else {
+      console.log("Функция " + functions[i].name + " не определена.");
+    }
+  }
+
+  // Уведомление после выполнения всех функций
+  ui.alert('Завершение', 'Все скрипты выполнены, ход пропущен. Проверьте лист Логи на предмет ошибок при пропуске хода.', ui.ButtonSet.OK);
+}
