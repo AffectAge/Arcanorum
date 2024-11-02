@@ -1,0 +1,302 @@
+Option Explicit
+
+Sub UpdateBuildingStatus_MultipleBuildings_WithXML()
+    Dim wsProvinces As Worksheet
+    Dim wsTemplates As Worksheet
+    Dim wsLog As Worksheet
+    Dim lastRowProvinces As Long
+    Dim lastRowTemplates As Long
+    Dim lastRowLog As Long
+    Dim i As Long, j As Long
+    Dim buildingsCell As String
+    Dim buildingEntries As Variant
+    Dim buildingEntry As Variant
+    Dim buildingName As String
+    Dim provinceLandscapesDict As Object
+    Dim xmlCondition As String
+    Dim isActive As Boolean
+    Dim dictTemplates As Object
+    Dim updatedBuildings As String
+    Dim xmlDoc As Object
+    Dim unmetConditions As Collection
+    Dim explanation As Collection
+    Dim processedBuildings As Object
+    Dim buildingCount As Integer
+    
+    ' Переменные для номеров столбцов с именованными диапазонами
+    Dim colProvinceName As Long
+    Dim colProvinceLandscapes As Long
+    Dim colProvinceBuildings As Long
+    Dim colTemplateBuildingName As Long
+    Dim colTemplateXMLCondition As Long
+    Dim colLogMessage As Long
+    Dim colLogLevel As Long
+    
+    ' Устанавливаем ссылки на листы
+    On Error GoTo ErrorHandler
+    Set wsProvinces = ThisWorkbook.Sheets("Провинции")
+    Set wsTemplates = ThisWorkbook.Sheets("Шаблоны построек")
+    
+    ' Получаем номера столбцов из именованных диапазонов
+    colProvinceName = wsProvinces.Range("Провинции_Названия").Column
+    colProvinceLandscapes = wsProvinces.Range("Провинции_Ландшафты").Column
+    colProvinceBuildings = wsProvinces.Range("Провинции_Постройки").Column
+    
+    colTemplateBuildingName = wsTemplates.Range("TemplateBuildingName").Column
+    colTemplateXMLCondition = wsTemplates.Range("TemplateXMLCondition").Column
+    
+    ' Проверяем наличие листа "Журнал событий" и создаём, если его нет
+    On Error Resume Next
+    Set wsLog = ThisWorkbook.Sheets("Журнал событий")
+    On Error GoTo 0
+    If wsLog Is Nothing Then
+        Set wsLog = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        wsLog.Name = "Журнал событий"
+        wsLog.Range("LogMessage").Cells(1, 1).Value = "Сообщение"
+        wsLog.Range("LogLevel").Cells(1, 1).Value = "Уровень"
+    End If
+    
+    ' Получаем номера столбцов для журнала
+    colLogMessage = wsLog.Range("ЖурналСобытий_Сообщения").Column
+    colLogLevel = wsLog.Range("ЖурналСобытий_Уровень").Column
+    
+    ' Создаём словарь для хранения XML-условий построек
+    Set dictTemplates = CreateObject("Scripting.Dictionary")
+    
+    ' Определяем последний заполненный ряд в листе Templates
+    lastRowTemplates = wsTemplates.Cells(wsTemplates.Rows.Count, colTemplateBuildingName).End(xlUp).Row
+    
+    ' Заполняем словарь шаблонов из XML
+    With wsTemplates
+        For i = 2 To lastRowTemplates
+            buildingName = Trim(.Cells(i, colTemplateBuildingName).Value)
+            If buildingName <> "" Then
+                xmlCondition = Trim(.Cells(i, colTemplateXMLCondition).Value)
+                dictTemplates(buildingName) = xmlCondition
+            End If
+        Next i
+    End With
+    
+    ' Определяем последний заполненный ряд в листе Provinces
+    lastRowProvinces = wsProvinces.Cells(wsProvinces.Rows.Count, colProvinceName).End(xlUp).Row
+    
+    ' Отключаем обновление экрана и автоматические вычисления для ускорения выполнения
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    
+    ' Коллекция для отслеживания обработанных зданий
+    Set processedBuildings = CreateObject("Scripting.Dictionary")
+    
+    ' Обрабатываем каждую строку в листе Provinces
+    With wsProvinces
+        For i = 2 To lastRowProvinces
+            buildingsCell = Trim(.Cells(i, colProvinceBuildings).Value)
+            updatedBuildings = ""
+            
+            If buildingsCell <> "" Then
+                buildingEntries = Split(buildingsCell, ";")
+                
+                ' Создаём словарь для быстрого поиска ландшафтов провинции
+                Set provinceLandscapesDict = CreateObject("Scripting.Dictionary")
+                Dim provinceLandscapes As Variant
+                provinceLandscapes = Split(LCase(.Cells(i, colProvinceLandscapes).Value), ",")
+                For j = LBound(provinceLandscapes) To UBound(provinceLandscapes)
+                    provinceLandscapesDict(Trim(provinceLandscapes(j))) = True
+                Next j
+                
+                ' Подсчёт количества зданий каждого типа в провинции
+                Dim buildingTypeCount As Object
+                Set buildingTypeCount = CreateObject("Scripting.Dictionary")
+                For j = LBound(buildingEntries) To UBound(buildingEntries)
+                    buildingEntry = Split(buildingEntries(j), ":")
+                    buildingName = Trim(buildingEntry(0))
+                    If buildingTypeCount.Exists(buildingName) Then
+                        buildingTypeCount(buildingName) = buildingTypeCount(buildingName) + 1
+                    Else
+                        buildingTypeCount(buildingName) = 1
+                    End If
+                Next j
+                
+                ' Основной цикл по зданиям
+                For j = LBound(buildingEntries) To UBound(buildingEntries)
+                    buildingEntry = Split(buildingEntries(j), ":")
+                    buildingName = Trim(buildingEntry(0))
+                    
+                    ' Проверка уникальности обработки каждого здания
+                    If Not processedBuildings.Exists(.Cells(i, colProvinceName).Value & "|" & buildingName) Then
+                        processedBuildings(.Cells(i, colProvinceName).Value & "|" & buildingName) = True
+                        buildingCount = buildingTypeCount(buildingName)
+                        
+                        If buildingName <> "" Then
+                            If dictTemplates.Exists(buildingName) Then
+                                xmlCondition = dictTemplates(buildingName)
+                                
+                                ' Создаём XML документ и загружаем в него строку с условиями
+                                Set xmlDoc = CreateObject("MSXML2.DOMDocument")
+                                xmlDoc.LoadXML xmlCondition
+                                
+                                ' Инициализируем коллекции для неудовлетворённых условий и объяснений
+                                Set unmetConditions = New Collection
+                                Set explanation = New Collection
+                                
+                                ' Проверяем, соответствует ли XML-условие ландшафтам провинции
+                                isActive = EvaluateXMLCondition(xmlDoc.DocumentElement, provinceLandscapesDict, unmetConditions, explanation)
+                                
+                                ' Обновляем статус постройки
+                                If isActive Then
+                                    updatedBuildings = updatedBuildings & buildingName & ":Активная; "
+                                Else
+                                    updatedBuildings = updatedBuildings & buildingName & ":Неактивная; "
+                                    
+                                    ' Запись детализированного объяснения в "Журнал событий"
+                                    lastRowLog = wsLog.Cells(wsLog.Rows.Count, colLogMessage).End(xlUp).Row + 1
+                                    wsLog.Cells(lastRowLog, colLogMessage).Value = "В провинции " & .Cells(i, colProvinceName).Value & " здания " & buildingName & " в количестве " & buildingCount & " неактивны." & vbCrLf & _
+                                                                           "Причина:" & vbCrLf & JoinConditions(explanation)
+                                    wsLog.Cells(lastRowLog, colLogLevel).Value = "ВНИМАНИЕ"
+                                End If
+                            Else
+                                updatedBuildings = updatedBuildings & buildingName & ":Шаблон не найден; "
+                            End If
+                        End If
+                    End If
+                Next j
+                
+                ' Удаляем последний "; ", только если есть данные для обновления
+                If Len(updatedBuildings) > 2 Then
+                    updatedBuildings = Left(updatedBuildings, Len(updatedBuildings) - 2)
+                End If
+                .Cells(i, colProvinceBuildings).Value = updatedBuildings
+            Else
+                .Cells(i, colProvinceBuildings).Value = "Нет построек"
+            End If
+        Next i
+    End With
+    ' Включаем обновление экрана и автоматические вычисления
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    MsgBox "Статусы построек успешно обновлены!", vbInformation
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "Произошла ошибка: " & Err.Description, vbCritical
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+End Sub
+
+Function JoinConditions(explanation As Collection) As String
+    Dim condition As Variant
+    Dim result As String
+    result = ""
+    Dim indentLevel As Integer
+    indentLevel = 0
+    
+    For Each condition In explanation
+        ' Уровень отступов и форматирование
+        Select Case True
+            Case InStr(condition, "AND") > 0 Or _
+                 InStr(condition, "OR") > 0 Or _
+                 InStr(condition, "NOT") > 0 Or _
+                 InStr(condition, "XOR") > 0 Or _
+                 InStr(condition, "NAND") > 0 Or _
+                 InStr(condition, "NOR") > 0
+                result = result & Space(indentLevel * 2) & condition & " (" & vbCrLf
+                indentLevel = indentLevel + 1
+            Case InStr(condition, ")") > 0
+                ' Проверяем, чтобы indentLevel оставался неотрицательным
+                If indentLevel > 0 Then indentLevel = indentLevel - 1
+                result = result & Space(indentLevel * 2) & ")" & vbCrLf
+            Case Else
+                ' Проверяем, чтобы не было отрицательных значений в вызове Space
+                If indentLevel >= 0 Then
+                    result = result & Space(indentLevel * 2) & condition & vbCrLf
+                Else
+                    result = result & condition & vbCrLf
+                End If
+        End Select
+    Next condition
+    JoinConditions = result
+End Function
+
+' Рекурсивная функция для обработки условий XML с добавлением вложений
+Function EvaluateXMLCondition(xmlNode As Object, landscapesDict As Object, unmetConditions As Collection, explanation As Collection) As Boolean
+    Dim childNode As Object
+    Dim conditionMet As Boolean
+    conditionMet = True
+
+    Select Case xmlNode.NodeName
+        Case "AND"
+            explanation.Add "AND Все подусловия должны быть истинными"
+            For Each childNode In xmlNode.ChildNodes
+                If Not EvaluateXMLCondition(childNode, landscapesDict, unmetConditions, explanation) Then
+                    conditionMet = False
+                End If
+            Next childNode
+            explanation.Add ")" ' Закрывающая скобка для AND
+            EvaluateXMLCondition = conditionMet
+
+        Case "OR"
+            explanation.Add "OR Должно выполняться хотя бы одно из условий"
+            conditionMet = False
+            For Each childNode In xmlNode.ChildNodes
+                If EvaluateXMLCondition(childNode, landscapesDict, unmetConditions, explanation) Then
+                    conditionMet = True
+                    Exit For
+                End If
+            Next childNode
+            explanation.Add ")" ' Закрывающая скобка для OR
+            EvaluateXMLCondition = conditionMet
+
+        Case "NOT"
+            explanation.Add "NOT Условие должно быть ложным"
+            conditionMet = Not EvaluateXMLCondition(xmlNode.ChildNodes(0), landscapesDict, unmetConditions, explanation)
+            If Not conditionMet Then unmetConditions.Add "Не выполнено условие NOT."
+            explanation.Add ")" ' Закрывающая скобка для NOT
+            EvaluateXMLCondition = conditionMet
+
+        Case "XOR"
+            explanation.Add "XOR Должно выполняться только одно из следующих условий"
+            Dim countTrue As Integer
+            countTrue = 0
+            For Each childNode In xmlNode.ChildNodes
+                If EvaluateXMLCondition(childNode, landscapesDict, unmetConditions, explanation) Then countTrue = countTrue + 1
+            Next childNode
+            conditionMet = (countTrue = 1)
+            If Not conditionMet Then unmetConditions.Add "Не выполнено условие XOR."
+            explanation.Add ")" ' Закрывающая скобка для XOR
+            EvaluateXMLCondition = conditionMet
+
+        Case "NAND"
+            explanation.Add "NAND Достаточно отсутствия хотя бы одного"
+            conditionMet = True
+            For Each childNode In xmlNode.ChildNodes
+                If Not EvaluateXMLCondition(childNode, landscapesDict, unmetConditions, explanation) Then
+                    conditionMet = False
+                End If
+            Next childNode
+            EvaluateXMLCondition = Not conditionMet ' Инверсия для NAND
+            explanation.Add ")" ' Закрывающая скобка для NAND
+            If Not conditionMet Then unmetConditions.Add "Не выполнено условие NAND."
+
+        Case "NOR"
+            explanation.Add "NOR Ни один из указанных ландшафтов не должен присутствовать"
+            conditionMet = True
+            For Each childNode In xmlNode.ChildNodes
+                If EvaluateXMLCondition(childNode, landscapesDict, unmetConditions, explanation) Then
+                    conditionMet = False
+                    Exit For
+                End If
+            Next childNode
+            explanation.Add ")" ' Закрывающая скобка для NOR
+            EvaluateXMLCondition = conditionMet
+            If Not conditionMet Then unmetConditions.Add "Не выполнено условие NOR."
+
+        Case "Ландшафт"
+            Dim landscape As String
+            landscape = xmlNode.Text
+            explanation.Add "Должен присутствовать ландшафт " & landscape
+            conditionMet = landscapesDict.Exists(LCase(landscape))
+            If Not conditionMet Then unmetConditions.Add "Ландшафт отсутствует: " & landscape
+            EvaluateXMLCondition = conditionMet
+
+    End Select
+End Function
