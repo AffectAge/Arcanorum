@@ -60,7 +60,19 @@ function processProvincesAndBuildings() {
 
 // Инициализация данных государства.
 function initializeStateData(ss) {
-  const stateName = ss.getRangeByName('Переменные_НазваниеГосударства').getValue();
+  // Получаем JSON-строку из диапазона 'Переменные_Ссылки'
+  const linksJSON = ss.getRangeByName('Переменные_Ссылки').getValue();
+  let stateName = 'Неизвестно'; // Значение по умолчанию
+
+  if (linksJSON) {
+    try {
+      const links = JSON.parse(linksJSON);
+      stateName = links.stateName || 'Неизвестно'; // Извлекаем stateName
+    } catch (e) {
+      Logger.log(`Ошибка парсинга JSON из 'Переменные_Ссылки': ${e}`);
+    }
+  }
+  
   const stateModifiersJSON = ss.getRangeByName('Переменные_МодификаторыГосударства').getValue();
   const stateModifiers = stateModifiersJSON ? JSON.parse(stateModifiersJSON) : {};
 
