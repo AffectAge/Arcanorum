@@ -86,7 +86,7 @@ function initializeStateData(ss) {
   const stateRaces = readDataFromRange('ПеременныеСписки_Расы');
   const stateTechnologies = readStateTechnologiesGeneral('ПеременныеСписки_Технологии');
   const stateLaws = readStateLawsGeneral('ПеременныеСписки_Законы');
-  const stateGovernmentType = ss.getRangeByName('Переменные_ТипПравительства').getValue();
+  // const stateGovernmentType = ss.getRangeByName('Переменные_ТипПравительства').getValue();
 
   const stateData = {
     cultures: stateCultures,
@@ -94,7 +94,7 @@ function initializeStateData(ss) {
     races: stateRaces,
     technologies: stateTechnologies,
     laws: stateLaws,
-    government_type: stateGovernmentType,
+    // government_type: stateGovernmentType,
     stability: stateStability,
     ...stateModifiers
   };
@@ -1056,8 +1056,8 @@ function getCriteriaList(type) {
       { key: 'required_province_resources', attribute: 'resources', description: 'Ресурсы', dataType: 'text' },
       { key: 'required_province_continents', attribute: 'continents', description: 'Континенты', dataType: 'text' },
       { key: 'required_province_planets', attribute: 'planets', description: 'Планеты', dataType: 'text' },
-      { key: 'required_province_radiation', attribute: 'radiation_level', description: 'Уровень радиации', dataType: 'number' },
-      { key: 'required_province_pollution', attribute: 'pollution_level', description: 'Уровень загрязнения', dataType: 'number' },
+      // { key: 'required_province_radiation', attribute: 'radiation_level', description: 'Уровень радиации', dataType: 'number' },
+      // { key: 'required_province_pollution', attribute: 'pollution_level', description: 'Уровень загрязнения', dataType: 'number' },
     ];
   } else if (type === 'state') {
     return [
@@ -1066,7 +1066,7 @@ function getCriteriaList(type) {
       { key: 'required_state_races', attribute: 'races', description: 'Расы государства', dataType: 'text' },
       { key: 'required_state_technologies', attribute: 'technologies', description: 'Технологии', dataType: 'text' },
       { key: 'required_state_laws', attribute: 'laws', description: 'Законы', dataType: 'text' },
-      { key: 'required_state_government', attribute: 'government_type', description: 'Тип правительства', dataType: 'text' },
+      // { key: 'required_state_government', attribute: 'government_type', description: 'Тип правительства', dataType: 'text' },
       { key: 'required_state_stability', attribute: 'stability', description: 'Социальная стабильность', dataType: 'number' },
     ];
   }
