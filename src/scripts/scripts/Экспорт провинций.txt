@@ -1,0 +1,53 @@
+function exportProvincesInfo() {
+  var startTime = new Date();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Получаем данные сразу
+    var sourceRange = ss.getRangeByName('Провинции_ОсновнаяИнформация');
+    var sourceData = sourceRange.getValues();
+    
+    // Изменение: Получаем JSON с ссылками из 'Переменные_Ссылки'
+    var linksRange = ss.getRangeByName('Переменные_Ссылки');
+    var linksJson = linksRange.getValue();
+    var links = JSON.parse(linksJson);
+    var targetSpreadsheetUrl = links['maplink']; // Получаем ссылку по ключу 'maplink'
+    
+    var targetSpreadsheet = SpreadsheetApp.openByUrl(targetSpreadsheetUrl);
+    var targetRange = targetSpreadsheet.getRangeByName('Провинции_ОсновнаяИнформация');
+    var targetData = targetRange.getValues();
+    
+    // Получаем значение "Название Государства" из текущей книги
+    var stateNameRange = ss.getRangeByName('Переменные_НазваниеГосударства');
+    var stateName = stateNameRange.getValue().trim();
+    
+    // Формируем карту провинций из текущей книги одним проходом
+    var provinceMap = {};
+    sourceData.forEach(function(row) {
+      if (row[0].trim() !== '') {  // Проверяем, что ячейка не пустая
+        var province = JSON.parse(row[0]);
+        provinceMap[province.province_id] = province;
+      }
+    });
+    
+    // Обновляем данные в целевой книге, только если "owner" совпадает с "stateName"
+    var updatedData = targetData.map(function(row) {
+      if (row[0].trim() !== '') {  // Проверяем, что ячейка не пустая
+        var targetProvince = JSON.parse(row[0]);
+        var updatedProvince = provinceMap[targetProvince.province_id];
+        
+        if (updatedProvince && targetProvince.owner === stateName) {
+          return [JSON.stringify(updatedProvince)];
+        }
+      }
+      return row;  // Возвращаем исходные данные, если провинция не найдена, "owner" не совпадает или ячейка пуста
+    });
+    
+    // Записываем обновленные данные обратно в целевую книгу одним вызовом
+    targetRange.setValues(updatedData);
+    
+    logResult("exportProvincesInfo", "", (new Date() - startTime) / 1000, "Успешно");
+  } catch (e) {
+    logResult("exportProvincesInfo", e.toString(), (new Date() - startTime) / 1000, "Ошибка");
+  }
+}
