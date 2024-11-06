@@ -136,7 +136,7 @@ function readProvincesData(ss) {
 
 // Чтение данных склада из единственного именованного диапазона.
 function readResourcesData(ss) {
-  const warehouseRange = ss.getRangeByName('Warehouse_Data');
+  const warehouseRange = ss.getRangeByName('БиржаТоваров_ОсновнаяИнформация');
   const warehouseValues = warehouseRange.getValues();
 
   const resourceList = [];
@@ -154,8 +154,8 @@ function readResourcesData(ss) {
         resourceList.push(resource.name);
         resourcePrices.push(resource.price || 0);
         resourceStock.push(resource.stock || 0);
-        resourceSupplyTotal.push(resource.supply || 0);
-        resourceDemand.push(resource.demand || 0);
+        resourceSupplyTotal.push(0);
+        resourceDemand.push(0);
         resourceIndexMap[resource.name] = index;
       } catch (e) {
         Logger.log(`Ошибка парсинга JSON для ресурса в строке ${index + 1}: ${e}`);
