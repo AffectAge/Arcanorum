@@ -34,6 +34,9 @@ function processProvincesAndBuildings() {
     targetProvinces.forEach(province => {
       processProvince(province, stateName, stateData, stateMetrics, buildingTemplatesMap, resourceIndexMap, resourceStock, resourcePrices, averageSalary, corporateTax, eventLog, attributesData, resourceDemand, resourceSupplyTotal);
     });
+	
+	// Обновление счетчика существования построек
+    updateCycleCounts(provincesData, stateName);
 
     // Обработка провинций других государств
     processOtherProvinces(otherProvinces, stateName, stateMetrics, eventLog);
@@ -41,6 +44,9 @@ function processProvincesAndBuildings() {
     // Применение лимитов построек на уровне государства и провинций
     enforceBuildingLimits(buildingTemplatesMap, targetProvinces, stateName, eventLog);
     enforceProvinceBuildingLimits(buildingTemplatesMap, provincesData, stateName, eventLog);
+	
+	// Применение глобальных лимитов построек
+    enforceGlobalBuildingLimits(ss, provincesData, buildingTemplatesMap, eventLog, stateName);
 
     // Ограничение атрибутов государства
     enforceStateAttributeLimits(attributesData, eventLog);
@@ -882,7 +888,7 @@ function enforceProvinceBuildingLimits(buildingTemplatesMap, provincesData, stat
 
             // Записываем сообщение в журнал событий
             eventLog.push([
-              `Лимит построек типа "${buildingName}" для провинции "${province.province_id}" превышен. Постройка была удалена.`,
+              `Лимит построек типа "${buildingName}" для провинции "${province.province_id}" превышен ${count}/${template.province_limit}. Постройка была удалена.`,
               'ВНИМАНИЕ'
             ]);
           }
@@ -890,6 +896,114 @@ function enforceProvinceBuildingLimits(buildingTemplatesMap, provincesData, stat
       }
     }
   });
+}
+
+// Функция для применения глобальных лимитов построек
+function enforceGlobalBuildingLimits(ss, provincesData, buildingTemplatesMap, eventLog, stateName) {
+  // Шаг 1: Определение глобальных лимитов
+  const globalLimits = {};
+  for (const buildingName in buildingTemplatesMap) {
+    const template = buildingTemplatesMap[buildingName];
+    if (template.global_limit !== undefined && template.global_limit > 0) {
+      globalLimits[buildingName] = {
+        limit: template.global_limit,
+        currentCount: 0,
+        buildings: [] // Список всех построек данного типа
+      };
+    }
+  }
+
+  Logger.log(`Применение глобальных лимитов для государства: ${stateName}`);
+
+  // Шаг 2: Подсчёт текущего количества построек с глобальными лимитами
+  provincesData.forEach(province => {
+    if (!province || !province.buildings) return;
+
+    province.buildings.forEach(building => {
+      if (globalLimits.hasOwnProperty(building.name)) {
+        globalLimits[building.name].currentCount++;
+        globalLimits[building.name].buildings.push({
+          province: province.province_id,
+          building: building,
+          owner: province.owner // Добавляем владельца провинции
+        });
+      }
+    });
+  });
+
+  // Шаг 3: Проверка и применение лимитов
+  for (const buildingName in globalLimits) {
+    const { limit, currentCount, buildings } = globalLimits[buildingName];
+    Logger.log(`Проверка глобального лимита для "${buildingName}": текущий счет = ${currentCount}, лимит = ${limit}`);
+
+    if (currentCount > limit) {
+      const excess = currentCount - limit;
+
+      // Разделяем построения на свои и чужие
+      const ourBuildings = buildings.filter(b => b.owner === stateName);
+      const otherBuildings = buildings.filter(b => b.owner !== stateName);
+
+      Logger.log(`Наши постройки "${buildingName}": ${ourBuildings.length}`);
+      Logger.log(`Постройки других государств "${buildingName}": ${otherBuildings.length}`);
+
+      if (ourBuildings.length === 0) {
+        // Нет построек, принадлежащих вашему государству, для удаления
+        eventLog.push([
+          `Глобальный лимит для постройки "${buildingName}" превышен (${currentCount}/${limit}), но нет построек в ваших провинциях для удаления.`,
+          'Уведомление'
+        ]);
+        continue; // Переходим к следующему типу построек
+      }
+
+      // Определяем минимальный cycle_count среди чужих построек
+      let minCycleCountOther = Infinity;
+      if (otherBuildings.length > 0) {
+        minCycleCountOther = Math.min(...otherBuildings.map(b => b.building.cycle_count));
+      }
+
+      Logger.log(`Минимальный cycle_count среди чужих построек "${buildingName}": ${minCycleCountOther}`);
+
+      // Выбираем свои построения, которые не старее построек других государств
+      const eligibleBuildingsToRemove = ourBuildings.filter(b => b.building.cycle_count <= minCycleCountOther);
+
+      Logger.log(`Своих построек, подходящих для удаления "${buildingName}": ${eligibleBuildingsToRemove.length}`);
+
+      if (eligibleBuildingsToRemove.length === 0) {
+        // Нет своих построек, подходящих для удаления
+        eventLog.push([
+          `Глобальный лимит для постройки "${buildingName}" превышен (${currentCount}/${limit}), но все ваши постройки старее или равны по cycle_count построек других государств.`,
+          'Уведомление'
+        ]);
+        continue; // Переходим к следующему типу построек
+      }
+
+      // Сортируем подходящие построения по cycle_count по возрастанию (самые новые первыми)
+      eligibleBuildingsToRemove.sort((a, b) => {
+        return a.building.cycle_count - b.building.cycle_count; // Новые постройки первыми
+      });
+
+      // Определяем количество построек, которые нужно удалить из своих построек
+      const buildingsToRemoveCount = Math.min(excess, eligibleBuildingsToRemove.length);
+      Logger.log(`Необходимо удалить ${buildingsToRemoveCount} построек "${buildingName}" из ваших провинций.`);
+
+      // Удаление избыточных построек
+      for (let i = 0; i < buildingsToRemoveCount; i++) {
+        const buildingToRemove = eligibleBuildingsToRemove[i];
+        const province = provincesData.find(p => p.province_id === buildingToRemove.province);
+        if (province && province.buildings) {
+          const index = province.buildings.indexOf(buildingToRemove.building);
+          if (index > -1) {
+            province.buildings.splice(index, 1);
+            eventLog.push([
+              `Глобальный лимит для постройки "${buildingName}" превышен. Постройка в вашей провинции "${province.province_id}" была удалена.`,
+              'Уведомление'
+            ]);
+            Logger.log(`Удалена постройка "${buildingName}" из провинции "${province.province_id}".`);
+          }
+        }
+      }
+    }
+  }
 }
 
 // Чтение шаблонов построек.
@@ -1584,4 +1698,21 @@ function checkBuildingLandRequirements(buildingTemplate, province) {
       // reason: `Недостаточно земель: требуется ${requiredLand}, доступно ${freeLand}`
     };
   }
+}
+
+// Функция для обновления cycle_count для построек в провинциях, принадлежащих государству
+function updateCycleCounts(provincesData, stateName) {
+  provincesData.forEach(province => {
+    if (!province || province.owner !== stateName || !province.buildings) return;
+
+    province.buildings.forEach(building => {
+      if (building && typeof building === 'object') {
+        if (building.cycle_count === undefined || building.cycle_count === null) {
+          building.cycle_count = 1; // Инициализация cycle_count, если его нет
+        } else {
+          building.cycle_count += 1; // Увеличение cycle_count
+        }
+      }
+    });
+  });
 }

@@ -2,10 +2,12 @@
   "building_id": "1",
   "name": "Универсальный завод",
   "owner": "",
+  "cycle_count":3,
   "required_workers": 10000,
   "required_agricultural_land": 500,
   "building_limit": 10,
   "province_limit": 3,
+  "global_limit": 1,
   "required_construction_points": 300,
   "construction_costs": {
     "gas": 200,
