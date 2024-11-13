@@ -48,6 +48,7 @@
  "province_attributes": {
     "transport_infrastructure": 500
  },
+ "required_buildings": ["Электростанция", "Хранилище"],
  "required_province_attributes": {
     "province_loyalty": { "min": 7, "max": 10 }
   },
@@ -74,16 +75,6 @@
   },
   "required_province_planets": {
   },
-  "required_province_radiation": {
-    "AND": [
-      { "GREATER_THAN": -1 }
-    ]
-  },
-  "required_province_pollution": {
-  "AND": [
-      { "GREATER_THAN": -1 }
-    ]
-  },
   "required_state_technologies": { 
   },
   "required_state_laws": {
@@ -106,10 +97,5 @@
   },
   "required_state_races": {
     
-  },
-  "required_state_stability": {
-    "AND": [
-      { "GREATER_THAN": -1 }
-    ]
   }
 }
