@@ -995,7 +995,7 @@ function enforceGlobalBuildingLimits(ss, provincesData, buildingTemplatesMap, ev
           if (index > -1) {
             province.buildings.splice(index, 1);
             eventLog.push([
-              `Глобальный лимит для постройки "${buildingName}" превышен. Постройка в вашей провинции "${province.province_id}" была удалена.`,
+              `Лимит на количество построек "${buildingName}" превышен для мира. Постройка в вашей провинции "${province.province_id}" была удалена.`,
               'Уведомление'
             ]);
             Logger.log(`Удалена постройка "${buildingName}" из провинции "${province.province_id}".`);
@@ -1569,18 +1569,17 @@ function generateBuildableProvinces(provincesData, buildingTemplatesMap, stateDa
     template.buildable_provinces = []; // Инициализируем пустой список
 
     // Получаем лимиты из шаблона
-    const stateLimit = template.building_limit || Infinity; // Если нет лимита, считаем его бесконечным
+    const globalLimit = template.global_limit || Infinity; // Если нет лимита, считаем его бесконечным
     const provinceLimit = template.province_limit || Infinity;
 
-    const currentStateCount = stateBuildingCounts[buildingName] || 0;
+    const currentGlobalCount = stateBuildingCounts[buildingName] || 0;
 
-    // Если достигнут лимит построек на уровне государства, пропускаем этот тип построек
-    if (currentStateCount >= stateLimit) {
-      // Logger.log(`Лимит построек типа "${buildingName}" на уровне государства достигнут (${currentStateCount}/${stateLimit}). Провинции не могут строить это здание.`);
+    // Если достигнут глобальный лимит построек данного типа, пропускаем этот тип построек
+    if (currentGlobalCount >= globalLimit) {
       continue;
     }
 
-    let remainingStateLimit = stateLimit - currentStateCount;
+    let remainingGlobalLimit = globalLimit - currentGlobalCount;
 
     // Проходим по каждой провинции
     provincesData.forEach(province => {
@@ -1591,23 +1590,26 @@ function generateBuildableProvinces(provincesData, buildingTemplatesMap, stateDa
 
       // Проверяем, не достигнут ли лимит построек в провинции
       if (currentProvinceCount >= provinceLimit) {
-        // Пропускаем провинцию, так как она достигла лимита
-        // Logger.log(`Лимит построек типа "${buildingName}" в провинции "${province.province_id}" достигнут (${currentProvinceCount}/${provinceLimit}).`);
-        return;
+        return; // Пропускаем провинцию, так как она достигла лимита
       }
 
-      // Проверяем соответствие критериев провинции и государства
-      const criteriaMet = checkBuildingCriteriaForBuildableProvinces(template, province, stateData, stateName, attributesData);
+      // Проверяем соответствие критериев провинции и государства, включая глобальный лимит
+      const criteriaMet = checkBuildingCriteriaForBuildableProvinces(
+        template,
+        province,
+        stateData,
+        stateName,
+        attributesData,
+        remainingGlobalLimit
+      );
 
       if (criteriaMet) {
-        // Добавляем провинцию в список, если не превышен общий лимит
-        if (remainingStateLimit > 0) {
-          template.buildable_provinces.push(province.province_id);
-          // Уменьшаем оставшийся лимит на уровне государства
-          remainingStateLimit--;
-          // Увеличиваем счётчик построек
-          stateBuildingCounts[buildingName] = (stateBuildingCounts[buildingName] || 0) + 1;
-        }
+        // Добавляем провинцию в список, если не превышен глобальный лимит
+        template.buildable_provinces.push(province.province_id);
+        // Уменьшаем оставшийся глобальный лимит
+        remainingGlobalLimit--;
+        // Увеличиваем счётчик построек
+        stateBuildingCounts[buildingName] = (stateBuildingCounts[buildingName] || 0) + 1;
       }
     });
   }
@@ -1616,7 +1618,7 @@ function generateBuildableProvinces(provincesData, buildingTemplatesMap, stateDa
 }
 
 // Модифицированная функция проверки критериев для генерации списка провинций
-function checkBuildingCriteriaForBuildableProvinces(buildingTemplate, province, stateData, stateName, attributesData) {
+function checkBuildingCriteriaForBuildableProvinces(buildingTemplate, province, stateData, stateName, attributesData, remainingGlobalLimit) {
   // Проверка общих критериев провинции
   const provinceCriteriaMet = checkCriteria(buildingTemplate, province, 'province').success;
   if (!provinceCriteriaMet) return false;
@@ -1627,23 +1629,19 @@ function checkBuildingCriteriaForBuildableProvinces(buildingTemplate, province, 
 
   // Проверка атрибутов провинции и государства
   const attributesCheck = checkBuildingAttributeRequirements(buildingTemplate, province, attributesData);
-  if (!attributesCheck.success) {
-    // Logger.log(`Критерии атрибутов не выполнены для постройки "${buildingTemplate.name}" в провинции "${province.province_id}": ${attributesCheck.reasons.join('; ')}`);
-    return false;
-  }
+  if (!attributesCheck.success) return false;
 
   // Проверка требований к рабочей силе
   const workerCheck = checkBuildingWorkerRequirements(buildingTemplate, province);
-  if (!workerCheck.success) {
-    // Logger.log(`Критерии рабочих не выполнены для постройки "${buildingTemplate.name}" в провинции "${province.province_id}": ${workerCheck.reason}`);
-    return false;
-  }
+  if (!workerCheck.success) return false;
 
-  // Проверка требований к землям
+  // Проверка требований к землепользованию
   const landCheck = checkBuildingLandRequirements(buildingTemplate, province);
-  if (!landCheck.success) {
-    // Logger.log(`Критерии земель не выполнены для постройки "${buildingTemplate.name}" в провинции "${province.province_id}": ${landCheck.reason}`);
-    return false;
+  if (!landCheck.success) return false;
+
+  // Проверка глобального лимита
+  if (remainingGlobalLimit <= 0) {
+    return false; // Глобальный лимит достигнут
   }
 
   return true;
