@@ -48,7 +48,19 @@
  "province_attributes": {
     "transport_infrastructure": 500
  },
- "required_buildings": ["Электростанция", "Хранилище"],
+ "required_buildings": {
+    "AND": [
+      "BuildingA",
+      {
+        "OR": [
+          "BuildingB",
+          {
+            "NOT": "BuildingC"
+          }
+        ]
+      }
+    ]
+  },
  "required_province_attributes": {
     "province_loyalty": { "min": 7, "max": 10 }
   },
