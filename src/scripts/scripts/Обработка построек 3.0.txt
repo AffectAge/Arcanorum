@@ -232,9 +232,9 @@ function processProvince(province, stateName, stateData, stateMetrics, buildingT
       }
 
       // Применение модификаторов
-      const modifiers = applyBuildingModifiers(buildingTemplate, stateData);
+      const modifiers = applyBuildingModifiers(buildingTemplate);
       const productionEfficiency = modifiers.productionEfficiency;
-      const extractionCoefficient = modifiers.extractionCoefficient;
+      const extractionEfficiency = modifiers.extractionEfficiency;
       const consumptionEfficiency = modifiers.consumptionEfficiency;
 
       // Проверка критериев
@@ -267,7 +267,7 @@ function processProvince(province, stateName, stateData, stateMetrics, buildingT
 
       // Обработка resource_extraction
       if (building.status === 'Активная' && buildingTemplate.resource_extraction) {
-        processResourceExtraction(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, extractionCoefficient, provinceMessages, resourceDemand, resourceSupplyTotal);
+        processResourceExtraction(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, extractionEfficiency, provinceMessages, resourceDemand, resourceSupplyTotal);
       }
 
       // Обновление метрик
@@ -612,7 +612,7 @@ function handleSelfDestruction(province, eventLog) {
 }
 
 // Функция обработки добычи ресурсов для активной постройки
-function processResourceExtraction(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, extractionCoefficient, provinceMessages, resourceDemand, resourceSupplyTotal) {
+function processResourceExtraction(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, extractionEfficiency, provinceMessages, resourceDemand, resourceSupplyTotal) {
   const resourceExtraction = buildingTemplate.resource_extraction;
 
   // Проверяем, существует ли resource_extraction и не пустой ли он
@@ -624,7 +624,7 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
 
   for (const resourceName in resourceExtraction) {
     const baseExtractionAmount = resourceExtraction[resourceName];
-    const extractionAmount = baseExtractionAmount * extractionCoefficient;
+    const extractionAmount = baseExtractionAmount * extractionEfficiency;
 
     // Поиск ресурса в провинции
     const resourceEntryIndex = provinceResources.findIndex(res => res.startsWith(resourceName + ":"));
@@ -1173,54 +1173,13 @@ function resetProvinceAttributes(provinceAttributes) {
 }
 
 // Применение модификаторов к зданиям
-function applyBuildingModifiers(buildingTemplate, stateModifiers) {
-  const appliedModifiers = {
-    productionEfficiency: 0,
-    extractionCoefficient: 0,
-    consumptionEfficiency: 0
+function applyBuildingModifiers(buildingTemplate) {
+  const modifiers = buildingTemplate.modifiers || {};
+  return {
+    productionEfficiency: modifiers.production_efficiency || 1,
+    extractionEfficiency: modifiers.extraction_efficiency || 1,
+    consumptionEfficiency: modifiers.consumption_efficiency || 1
   };
-
-  if (buildingTemplate.modifiers) {
-    // Пример: для production_efficiency
-    if (buildingTemplate.modifiers.production_efficiency) {
-      appliedModifiers.productionEfficiency = getSummedModifiers(
-        buildingTemplate.modifiers.production_efficiency,
-        stateModifiers
-      );
-    }
-
-    // Пример: для extraction_coefficient
-    if (buildingTemplate.modifiers.extraction_coefficient) {
-      appliedModifiers.extractionCoefficient = getSummedModifiers(
-        buildingTemplate.modifiers.extraction_coefficient,
-        stateModifiers
-      );
-    }
-
-    // Пример: для consumption_efficiency (в шаблоне была опечатка, исправил на правильное написание)
-    if (buildingTemplate.modifiers.consumption_efficiency) {
-      appliedModifiers.consumptionEfficiency = getSummedModifiers(
-        buildingTemplate.modifiers.consumption_efficiency,
-        stateModifiers
-      );
-    }
-  }
-
-  return appliedModifiers;
-}
-
-// Функция для суммирования модификаторов
-function getSummedModifiers(modifiersArray, stateModifiers) {
-  let summedModifier = 0;
-
-  modifiersArray.forEach(modifierObj => {
-    const modifierName = modifierObj.name;
-    const modifierValue = stateModifiers[modifierName] || 0; // Если модификатор не найден, используем значение 0
-
-    summedModifier += modifierValue; // Суммируем модификаторы
-  });
-
-  return summedModifier;
 }
 
 // Функция проверки критериев

@@ -14,18 +14,10 @@
     "stone": 5000
   },
   "modifiers": {
-    "production_efficiency": [
-      {"name": "fabric_efficiency"},
-      {"name": "updated_chains"}
-    ],
-    "extraction_coefficient": [
-      {"name": "mass_extraction"}
-    ],
-    "consumption_efficiency": [
-      {"name": "mass_consumption"},
-      {"name": "fabric_technology"}
-    ]
-  },
+    "production_efficiency": 100,
+	"extraction_efficiency": 100,
+	"consumption_efficiency": 100
+    },
   "resource_extraction": {
     "energy": 100
     },
