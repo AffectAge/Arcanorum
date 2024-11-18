@@ -42,12 +42,12 @@
  },
  "required_buildings": {
     "AND": [
-      "BuildingA",
+      "Универсальный завод",
       {
         "OR": [
-          "BuildingB",
+          "Универсальный завод",
           {
-            "NOT": "BuildingC"
+            "NOT": "Универсальный завод"
           }
         ]
       }
@@ -101,5 +101,6 @@
   },
   "required_state_races": {
     
-  }
+  },
+  "buildable_provinces":["1","2","3"]
 }

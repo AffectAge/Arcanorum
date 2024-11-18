@@ -1527,6 +1527,7 @@ function formatDataValue(dataValue) {
 }
 
 // Функция для генерации списка допустимых провинций для каждой постройки с учётом лимитов
+// Функция для генерации списка допустимых провинций для каждой постройки с учётом лимитов
 function generateBuildableProvinces(provincesData, buildingTemplatesMap, stateData, stateName, attributesData) {
   // Создаём копию шаблонов построек, чтобы не изменять оригинальные данные
   const updatedBuildingTemplatesMap = JSON.parse(JSON.stringify(buildingTemplatesMap));
@@ -1573,7 +1574,7 @@ function generateBuildableProvinces(provincesData, buildingTemplatesMap, stateDa
         return; // Пропускаем провинцию, так как она достигла лимита
       }
 
-      // Проверяем соответствие критериев провинции и государства, включая глобальный лимит
+      // Проверяем соответствие критериев провинции и государства, включая зависимые постройки и глобальный лимит
       const criteriaMet = checkBuildingCriteriaForBuildableProvinces(
         template,
         province,
@@ -1584,17 +1585,12 @@ function generateBuildableProvinces(provincesData, buildingTemplatesMap, stateDa
       );
 
       if (criteriaMet) {
-        // Проверяем, выполнены ли зависимости от других построек
-        const dependenciesMet = buildingTemplate.required_buildings.every(reqBuilding => province.buildings.some(b => b.name === reqBuilding));
-
-        if (dependenciesMet) {
-          // Добавляем провинцию в список, если не превышен глобальный лимит
-          template.buildable_provinces.push(province.province_id);
-          // Уменьшаем оставшийся глобальный лимит
-          remainingGlobalLimit--;
-          // Увеличиваем счётчик построек
-          stateBuildingCounts[buildingName] = (stateBuildingCounts[buildingName] || 0) + 1;
-        }
+        // Добавляем провинцию в список, если не превышен глобальный лимит
+        template.buildable_provinces.push(province.province_id);
+        // Уменьшаем оставшийся глобальный лимит
+        remainingGlobalLimit--;
+        // Увеличиваем счётчик построек
+        stateBuildingCounts[buildingName] = (stateBuildingCounts[buildingName] || 0) + 1;
       }
     });
   }
@@ -1623,14 +1619,14 @@ function checkBuildingCriteriaForBuildableProvinces(buildingTemplate, province, 
   // Проверка требований к землепользованию
   const landCheck = checkBuildingLandRequirements(buildingTemplate, province);
   if (!landCheck.success) return false;
-  
-  // Проверка зависимостей построек
-  if (buildingTemplate.required_buildings && buildingTemplate.required_buildings.length > 0) {
-    const existingBuildings = province.buildings.map(b => b.name);
-    const missingBuildings = buildingTemplate.required_buildings.filter(req => !existingBuildings.includes(req));
 
-    if (missingBuildings.length > 0) {
-      return false; // Зависимые постройки отсутствуют
+  // Проверка зависимостей построек с использованием новой логики
+  if (buildingTemplate.required_buildings) {
+    const existingBuildings = province.buildings.map(b => b.name);
+    const dependenciesResult = evaluateBuildingCriteria(buildingTemplate.required_buildings, existingBuildings);
+    if (!dependenciesResult.met) {
+      // Опционально: можно добавить логику для логирования причин отсутствия зависимостей
+      return false;
     }
   }
 
