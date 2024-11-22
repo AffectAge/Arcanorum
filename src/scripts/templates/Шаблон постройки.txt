@@ -53,6 +53,10 @@
       }
     ]
   },
+  "required_state_buildings": {
+    "AND": ["Капитальный Завод", "Научный Институт"],
+    "OR": ["Военная База", "Полицейский Участок"]
+  },
  "required_province_attributes": {
     "province_loyalty": { "min": 7, "max": 10 }
   },
@@ -90,14 +94,6 @@
   "required_state_cultures": { 
   },
   "required_state_religions": {
-  },
-  "required_state_buildings": {
-    
-  },
-  "required_state_government": { 
-  },
-  "required_state_territorial_device": {
-    
   },
   "required_state_races": {
     
