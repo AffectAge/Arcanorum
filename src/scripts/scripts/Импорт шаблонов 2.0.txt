@@ -1,0 +1,266 @@
+function importGeneralTemplates() { 
+  var startTime = new Date();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var errorOccurred = false; // Флаг для определения необходимости остановки выполнения
+
+  try {
+    // Чтение объединённого именованного диапазона 'Переменные_Объединенные'
+    var combinedRange = ss.getRangeByName('Переменные_Объединенные');
+    if (!combinedRange) {
+      throw new Error("Именованный диапазон 'Переменные_Объединенные' не найден.");
+    }
+    var combinedValues = combinedRange.getValues();
+
+    // Создание объекта для хранения ключ-значение
+    var variables = {};
+    combinedValues.forEach(function(row) {
+      var key = row[0];
+      var value = row[1];
+      if (key && value) {
+        try {
+          variables[key] = JSON.parse(value);
+        } catch (e) {
+          Logger.log(`Ошибка парсинга JSON для ключа "${key}": ${e}`);
+          variables[key] = {}; // Присваиваем пустой объект в случае ошибки парсинга
+        }
+      }
+    });
+
+    // Проверка наличия необходимого ключа 'linksJSON'
+    if (!variables.linksJSON) {
+      throw new Error("Ключ 'linksJSON' отсутствует в 'Переменные_Объединенные'.");
+    }
+
+    // Массив с конфигурацией для каждого набора данных
+    var configurations = [
+      {
+        sourceLinkKey: 'maplink', // Ключ для получения URL книги из JSON
+        sourceRangeName: 'Постройки_Шаблоны', // Имя диапазона в книге-источнике
+        targetRangeName: 'Постройки_Шаблоны', // Имя диапазона в целевой книге
+        keysToPreserve: [] // Ключи, которые нужно сохранить
+      },
+      {
+        sourceLinkKey: 'maplink', // Ключ для получения URL книги из JSON
+        sourceRangeName: 'Технологии_Шаблоны', // Имя диапазона в книге-источнике
+        targetRangeName: 'ПеременныеСписки_Технологии', // Имя диапазона в целевой книге
+        keysToPreserve: ['status'] // Ключи, которые нужно сохранить
+      },
+      {
+        sourceLinkKey: 'maplink', // Ключ для получения URL книги из JSON
+        sourceRangeName: 'Законы_Шаблоны', // Имя диапазона в книге-источнике
+        targetRangeName: 'ПеременныеСписки_Законы', // Имя диапазона в целевой книге
+        keysToPreserve: ['status'] // Ключи, которые нужно сохранить
+      }
+      // Можно добавить больше объектов по аналогии
+    ];
+
+    // Объект для группировки конфигураций по ссылкам на книги
+    var groupedConfigurations = {};
+
+    // Перебираем конфигурации и группируем их по ссылкам, полученным из JSON
+    configurations.forEach(function(config) {
+      var sourceUrl = variables.linksJSON[config.sourceLinkKey]; // Извлекаем URL по ключу
+
+      if (sourceUrl !== undefined) {
+        // Если для этой ссылки ещё нет группы, создаём её
+        if (!groupedConfigurations.hasOwnProperty(sourceUrl)) {
+          groupedConfigurations[sourceUrl] = [];
+        }
+        // Добавляем конфигурацию в группу
+        groupedConfigurations[sourceUrl].push(config);
+      } else {
+        Logger.log(`Ключ '${config.sourceLinkKey}' отсутствует в 'linksJSON'.`);
+        ss.toast(`Ключ '${config.sourceLinkKey}' отсутствует в 'linksJSON'.`, "Ошибка импорта шаблонов");
+        errorOccurred = true; // Устанавливаем флаг ошибки
+      }
+    });
+
+    var openedSpreadsheets = {}; // Объект для хранения открытых спредшитов
+
+    // Перебираем сгруппированные конфигурации
+    for (var sourceUrl in groupedConfigurations) {
+      try {
+        // Проверяем, открыта ли уже книга с этой ссылкой
+        if (!openedSpreadsheets[sourceUrl]) {
+          try {
+            var sourceSpreadsheet = SpreadsheetApp.openByUrl(sourceUrl);
+            openedSpreadsheets[sourceUrl] = sourceSpreadsheet;
+          } catch (e) {
+            var errorMessage = `Ошибка при открытии книги по ссылке '${sourceUrl}': ${e}`;
+            Logger.log(errorMessage);
+            ss.toast(errorMessage, "Ошибка импорта шаблонов");
+            logResult("importGeneralTemplates", errorMessage, (new Date() - startTime) / 1000, "Ошибка");
+            errorOccurred = true; // Устанавливаем флаг ошибки
+            continue; // Пропускаем эту группу конфигураций
+          }
+        }
+
+        var sourceBook = openedSpreadsheets[sourceUrl];
+        var configsForBook = groupedConfigurations[sourceUrl];
+
+        // Для каждой конфигурации, относящейся к текущей книге, выполняем импорт
+        configsForBook.forEach(function(config) {
+          try {
+            importAndMergeTemplates(
+              sourceBook, 
+              config.sourceRangeName, 
+              ss, 
+              config.targetRangeName, 
+              config.keysToPreserve
+            );
+          } catch (e) {
+            var errorMessage = `Ошибка при импорте данных из книги '${sourceUrl}': ${e}`;
+            Logger.log(errorMessage);
+            ss.toast(errorMessage, "Ошибка импорта шаблонов");
+            logResult("importAndMergeTemplates", errorMessage, (new Date() - startTime) / 1000, "Ошибка");
+            errorOccurred = true; // Устанавливаем флаг ошибки
+          }
+        });
+
+      } catch (e) {
+        var errorMessage = `Общая ошибка при обработке книги по ссылке '${sourceUrl}': ${e}`;
+        Logger.log(errorMessage);
+        ss.toast(errorMessage, "Ошибка импорта шаблонов");
+        logResult("importGeneralTemplates", errorMessage, (new Date() - startTime) / 1000, "Ошибка");
+        errorOccurred = true; // Устанавливаем флаг ошибки
+        continue; // Продолжаем со следующей книгой, если текущую открыть не удалось
+      }
+    }
+
+    if (!errorOccurred) {
+      logResult("importGeneralTemplates", "", (new Date() - startTime) / 1000, "Успешно");
+    } else {
+      logResult("importGeneralTemplates", "Скрипт завершен с ошибками при импорте шаблонов.", (new Date() - startTime) / 1000, "Ошибка");
+    }
+
+  } catch (e) {
+    var errorMessage = `Общая ошибка в функции importGeneralTemplates: ${e}`;
+    logResult("importGeneralTemplates", errorMessage, (new Date() - startTime) / 1000, "Ошибка");
+  }
+}
+
+/**
+ * Функция для импорта и слияния шаблонов из книги-источника в целевую книгу.
+ * @param {Spreadsheet} sourceBook - Книга-источник.
+ * @param {string} sourceRangeName - Имя диапазона в книге-источнике.
+ * @param {Spreadsheet} targetBook - Целевая книга.
+ * @param {string} targetRangeName - Имя диапазона в целевой книге.
+ * @param {Array<string>} keysToPreserve - Массив ключей, которые нужно сохранить из целевой книги.
+ */
+function importAndMergeTemplates(sourceBook, sourceRangeName, targetBook, targetRangeName, keysToPreserve) {
+  // Получаем диапазон из книги-источника
+  var sourceRange = sourceBook.getRangeByName(sourceRangeName);
+  var sourceValues = sourceRange.getValues();
+  
+  // Проверка на наличие данных в диапазоне
+  if (sourceValues.length === 0 || sourceValues[0].length === 0) {
+    var errorMessage = `Диапазон '${sourceRangeName}' в книге '${sourceBook.getName()}' не содержит данных.`;
+    Logger.log(errorMessage);
+    logResult("importAndMergeTemplates", errorMessage, 0, "Ошибка");
+    throw new Error(errorMessage);
+  }
+
+  // Получаем целевой диапазон
+  var targetRange = targetBook.getRangeByName(targetRangeName);
+  var targetValues = targetRange.getValues();
+  
+  // Проверка на наличие данных в целевом диапазоне
+  if (targetValues.length === 0 || targetValues[0].length === 0) {
+    var errorMessage = `Диапазон '${targetRangeName}' в книге '${targetBook.getName()}' не содержит данных.`;
+    Logger.log(errorMessage);
+    logResult("importAndMergeTemplates", errorMessage, 0, "Ошибка");
+    throw new Error(errorMessage);
+  }
+
+  // Преобразуем данные из книги-источника в словарь
+  var sourceData = {};
+  for (var i = 0; i < sourceValues.length; i++) {
+    var jsonStr = sourceValues[i][0];
+    if (jsonStr) {
+      try {
+        var techData = JSON.parse(jsonStr);
+        if (techData && techData.name) { // Проверяем, что свойство name существует
+          var techName = techData.name;
+          sourceData[techName] = techData;
+        } else {
+          var warningMessage = `Некорректный формат JSON в строке ${i + 1}: ${jsonStr}`;
+          Logger.log(warningMessage);
+          logResult("importAndMergeTemplates", warningMessage, 0, "Ошибка");
+        }
+      } catch (e) {
+        var errorMessage = `Ошибка при парсинге JSON в книге-источнике, строка ${i + 1}: ${e}`;
+        Logger.log(errorMessage);
+        logResult("importAndMergeTemplates", errorMessage, 0, "Ошибка");
+        continue;
+      }
+    }
+  }
+  
+  // Преобразуем данные из целевой книги в словарь
+  var targetData = {};
+  for (var i = 0; i < targetValues.length; i++) {
+    var jsonStr = targetValues[i][0];
+    if (jsonStr) {
+      try {
+        var techData = JSON.parse(jsonStr);
+        if (techData && techData.name) { // Проверяем, что свойство name существует
+          var techName = techData.name;
+          targetData[techName] = {
+            data: techData,
+            rowIndex: i
+          };
+        } else {
+          var warningMessage = `Некорректный формат JSON в строке ${i + 1}: ${jsonStr}`;
+          Logger.log(warningMessage);
+          logResult("importAndMergeTemplates", warningMessage, 0, "Ошибка");
+        }
+      } catch (e) {
+        var errorMessage = `Ошибка при парсинге JSON в целевой книге, строка ${i + 1}: ${e}`;
+        Logger.log(errorMessage);
+        logResult("importAndMergeTemplates", errorMessage, 0, "Ошибка");
+        continue;
+      }
+    }
+  }
+  
+  var updatedValues = [];
+  
+  // Обрабатываем данные из книги-источника
+  for (var techName in sourceData) {
+    var sourceTechData = sourceData[techName];
+    
+    if (targetData.hasOwnProperty(techName)) {
+      // Технология существует в целевой книге
+      var targetTechData = targetData[techName].data;
+      
+      // Сохраняем указанные ключи из целевой книги
+      keysToPreserve.forEach(function(key) {
+        if (targetTechData.hasOwnProperty(key)) {
+          sourceTechData[key] = targetTechData[key];
+        }
+      });
+      
+      updatedValues.push([JSON.stringify(sourceTechData)]);
+      delete targetData[techName];
+    } else {
+      // Новая технология, добавляем её
+      updatedValues.push([JSON.stringify(sourceTechData)]);
+    }
+  }
+  
+  // Очищаем старый диапазон и устанавливаем новые значения
+  targetRange.clearContent();
+  
+  var numRows = updatedValues.length;
+  var numCols = 1;
+  var newRange = targetRange.offset(0, 0, numRows, numCols);
+  
+  try {
+    newRange.setValues(updatedValues);
+  } catch (e) {
+    var errorMessage = `Ошибка при записи данных в диапазон '${targetRangeName}': ${e}`;
+    Logger.log(errorMessage);
+    logResult("importAndMergeTemplates", errorMessage, 0, "Ошибка");
+    throw new Error(errorMessage);
+  }
+}
