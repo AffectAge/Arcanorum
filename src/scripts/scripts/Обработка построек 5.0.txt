@@ -56,7 +56,6 @@ function processProvincesAndBuildings() {
 }
 
 // Функция для централизованного чтения всех необходимых именованных диапазонов
-// Функция для централизованного чтения всех необходимых именованных диапазонов
 function readAllData(ss) {
   const data = {};
   
@@ -127,10 +126,12 @@ function readAllData(ss) {
   data.technologies = readStateTechnologiesGeneralFromRaw(data.technologiesRaw);
   data.laws = readStateLawsGeneralFromRaw(data.lawsRaw);
   
-  data.resourcesData = readResourcesDataFromRaw(data.resourcesRaw);
+  // Изменено: Чтение данных ресурсов с учетом новой структуры JSON
+  data.stateName = data.linksJSON ? data.linksJSON.stateName || 'Неизвестно' : 'Неизвестно'; // Добавлено
+  data.resourcesData = readResourcesDataFromRaw(data.resourcesRaw, data.stateName); // Изменено
   data.resourceList = data.resourcesData.resourceList;
-  data.resourcePrices = data.resourcesData.resourcePrices;
-  data.resourceStock = data.resourcesData.resourceStock;
+  data.resourcePrices = data.resourcesData.resourcePrices; // Теперь это объект, ключами являются названия стран
+  data.resourceStock = data.resourcesData.resourceStock;   // Аналогично
   data.resourceSupplyTotal = data.resourcesData.resourceSupplyTotal;
   data.resourceDemand = data.resourcesData.resourceDemand;
   data.resourceIndexMap = data.resourcesData.resourceIndexMap;
@@ -201,19 +202,26 @@ function writeAllData(ss, data, eventLog, stateMetrics) {
   });
   buildingTemplatesRange.setValues(updatedBuildingTemplatesValues);
   
-  // Обновление данных склада ресурсов
+  // Изменено: Обновление данных склада ресурсов с учетом новой структуры JSON
   const warehouseRange = ss.getRangeByName('БиржаТоваров_ОсновнаяИнформация');
   const updatedWarehouseValues = data.resourcesRaw.map((row, index) => {
     if (data.resourcesRaw[index][0]) {
-      const resourceName = data.resourceList[index];
-      const updatedResource = {
-        name: resourceName,
-        price: data.resourcePrices[index],
-        stock: data.resourceStock[index],
-        supply: data.resourceSupplyTotal[index],
-        demand: data.resourceDemand[index]
-      };
-      return [JSON.stringify(updatedResource)];
+      const resource = data.resourcesData.resourceList[index];
+      const resourceObj = JSON.parse(data.resourcesRaw[index][0]);
+      const countryData = resourceObj.countries[data.stateName]; // Изменено
+      
+      if (countryData) {
+        // Обновляем только данные вашей страны
+        countryData.price = data.resourcePrices[resource];
+        countryData.stock = data.resourceStock[resource];
+        countryData.supply = data.resourceSupplyTotal[resource];
+        countryData.demand = data.resourceDemand[resource];
+        // trade_supply, trade_demand, strategic_stock, trade_incomes, trade_expenses остаются без изменений
+        
+        return [JSON.stringify(resourceObj)];
+      } else {
+        return [JSON.stringify(resourceObj)];
+      }
     } else {
       return row;
     }
@@ -259,36 +267,49 @@ function initializeStateData(data) {
   };
 
   const stateMetrics = data.stateMetrics;
-
+  
+  data.stateName = stateName; // Изменено: Сохраняем stateName в data для использования в других функциях
+  
   return { stateName, stateData, stateMetrics, workersCoefficient, averageSalary, corporateTax };
 }
 
 // Функция для чтения данных ресурсов из предварительно прочитанных данных
-function readResourcesDataFromRaw(resourcesRaw) {
+// Изменено: Функция для централизованного чтения данных ресурсов с учетом новой структуры
+function readResourcesDataFromRaw(resourcesRaw, stateName) {
   const resourceList = [];
-  const resourcePrices = [];
-  const resourceStock = [];
-  const resourceSupplyTotal = [];
-  const resourceDemand = [];
+  const resourcePrices = {}; // Изменено: Объект с ключами по странам
+  const resourceStock = {};   // Изменено: Объект с ключами по странам
+  const resourceSupplyTotal = {};
+  const resourceDemand = {};
   const resourceIndexMap = {};
-
+  
   resourcesRaw.forEach((row, index) => {
     const resourceJSON = row[0];
     if (resourceJSON) {
       try {
         const resource = JSON.parse(resourceJSON);
         resourceList.push(resource.name);
-        resourcePrices.push(resource.price || 0);
-        resourceStock.push(resource.stock || 0);
-        resourceSupplyTotal.push(0);
-        resourceDemand.push(0);
+        
+        // Извлечение данных только для вашей страны
+        if (resource.countries && resource.countries[stateName]) { // Изменено
+          resourcePrices[resource.name] = resource.countries[stateName].price || 0; // Изменено
+          resourceStock[resource.name] = resource.countries[stateName].stock || 0;   // Изменено
+          // Остальные поля инициализируются отдельно
+        } else {
+          // Если данных для вашей страны нет, устанавливаем значения по умолчанию
+          resourcePrices[resource.name] = 0;
+          resourceStock[resource.name] = 0;
+        }
+        
+        resourceSupplyTotal[resource.name] = 0;
+        resourceDemand[resource.name] = 0;
         resourceIndexMap[resource.name] = index;
       } catch (e) {
         Logger.log(`Ошибка парсинга JSON для ресурса в строке ${index + 1}: ${e}`);
       }
     }
   });
-
+  
   return {
     resourceList,
     resourcePrices,
@@ -603,14 +624,14 @@ function processBuildingResources(
       continue;
     }
 
-    resourceDemand[index] += requiredAmount;
+    resourceDemand[resource] += requiredAmount;
 
-    if (resourceStock[index] >= requiredAmount) {
-      resourceStock[index] -= requiredAmount;
-      consumptionCost += requiredAmount * resourcePrices[index];
+    if (resourceStock[resource] >= requiredAmount) { // Изменено
+      resourceStock[resource] -= requiredAmount;
+      consumptionCost += requiredAmount * resourcePrices[resource]; // Изменено
     } else {
       consumptionPossible = false;
-      missingResources.push(`${resource}: требуется ${requiredAmount}, доступно ${resourceStock[index] || 0}`);
+      missingResources.push(`${resource}: требуется ${requiredAmount}, доступно ${resourceStock[resource] || 0}`); // Изменено
     }
   }
 
@@ -657,11 +678,11 @@ function processResourceProduction(
     }
 
     // Добавляем произведенное количество в общий запас и предложение
-    resourceSupplyTotal[index] += producedAmount;
-    resourceStock[index] += producedAmount;
+    resourceSupplyTotal[resource] += producedAmount; // Изменено
+    resourceStock[resource] += producedAmount;        // Изменено
 
     // Рассчитываем доход от производства
-    productionIncome += producedAmount * resourcePrices[index];
+    productionIncome += producedAmount * resourcePrices[resource]; // Изменено
   }
 
   if (!productionPossible) {
@@ -670,7 +691,7 @@ function processResourceProduction(
 
     // Формируем сообщение
     const provinceId = province.province_id || 'Неизвестно';
-    const message = `${missingResources.join('; ')}`;
+    const message = missingResources.join('; ');
     provinceMessages.push(message);
 
     return false; // Прекращаем дальнейшую обработку
@@ -734,6 +755,7 @@ function handleSelfDestruction(province, eventLog) {
 }
 
 // Функция обработки добычи ресурсов для активной постройки
+// Функция обработки добычи ресурсов для активной постройки
 function processResourceExtraction(building, buildingTemplate, province, resourceIndexMap, resourceStock, resourcePrices, extractionEfficiency, provinceMessages, resourceDemand, resourceSupplyTotal) {
   const resourceExtraction = buildingTemplate.resource_extraction;
 
@@ -765,9 +787,8 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
       // Достаточно ресурса для извлечения
       provinceResources[resourceEntryIndex] = `${resName}:${resQuantity - extractionAmount}`;
       // Добавляем на склад
-      const stockIndex = resourceIndexMap[resName];
-      if (stockIndex !== undefined) {
-        resourceStock[stockIndex] += extractionAmount;
+      if (resourceIndexMap[resName] !== undefined) { // Изменено
+        resourceStock[resName] += extractionAmount; // Изменено
       } else {
         // Ресурс не найден в списке ресурсов склада
         provinceMessages.push(`Тип ресурса "${resName}" не найден в складе.`);
@@ -775,11 +796,10 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
       }
 
       // Добавляем добытые ресурсы в предложение
-      resourceSupplyTotal[stockIndex] += extractionAmount;
+      resourceSupplyTotal[resName] += extractionAmount; // Изменено
 
       // Рассчитываем доход от добычи
-      const resourcePrice = resourcePrices[stockIndex] || 0;
-      const incomeFromExtraction = extractionAmount * resourcePrice;
+      const incomeFromExtraction = extractionAmount * resourcePrices[resName]; // Изменено
       building.incomes += incomeFromExtraction;
 
       // Рассчитываем количество циклов до истощения
@@ -791,17 +811,15 @@ function processResourceExtraction(building, buildingTemplate, province, resourc
     } else if (resQuantity > 0 && resQuantity <= extractionAmount) {
       // Остаток ресурса меньше или равен extractionAmount
       // Добавляем остаток на склад
-      const stockIndex = resourceIndexMap[resName];
-      if (stockIndex !== undefined) {
-        resourceStock[stockIndex] += resQuantity;
-        resourceSupplyTotal[stockIndex] += resQuantity;
+      if (resourceIndexMap[resName] !== undefined) { // Изменено
+        resourceStock[resName] += resQuantity; // Изменено
+        resourceSupplyTotal[resName] += resQuantity; // Изменено
       } else {
         // Ресурс не найден в списке ресурсов склада
         provinceMessages.push(`Тип ресурса "${resName}" не найден в складе.`);
       }
       // Добавляем доход от добычи остатка
-      const resourcePrice = resourcePrices[stockIndex] || 0;
-      const incomeFromExtraction = resQuantity * resourcePrice;
+      const incomeFromExtraction = resQuantity * resourcePrices[resName]; // Изменено
       building.incomes += incomeFromExtraction;
 
       // Удаляем ресурс из провинции
