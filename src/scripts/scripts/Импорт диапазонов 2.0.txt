@@ -1,0 +1,164 @@
+function importNamedRangesInfo() {
+  var startTime = new Date();
+  try {
+    var cache = CacheService.getScriptCache();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Чтение объединённого именованного диапазона 'Переменные_Объединенные'
+    var combinedRange = ss.getRangeByName('Переменные_Объединенные');
+    if (!combinedRange) {
+      throw new Error("Именованный диапазон 'Переменные_Объединенные' не найден.");
+    }
+    var combinedValues = combinedRange.getValues();
+
+    // Создание объекта для хранения ключ-значение
+    var variables = {};
+    combinedValues.forEach(function(row) {
+      var key = row[0];
+      var value = row[1];
+      if (key && value) {
+        try {
+          variables[key] = JSON.parse(value);
+        } catch (e) {
+          Logger.log(`Ошибка парсинга JSON для ключа "${key}": ${e}`);
+          // Можно решить, как обрабатывать некорректные JSON, например, присвоить пустой объект
+          variables[key] = {};
+        }
+      }
+    });
+
+    // Проверка наличия необходимого ключа 'linksJSON'
+    if (!variables.linksJSON) {
+      throw new Error("Ключ 'linksJSON' отсутствует в 'Переменные_Объединенные'.");
+    }
+
+    // Определение задач импорта с указанием соответствующих ключей для ссылок
+    var importTasks = [
+
+      // Импорт данных провинций
+      {
+        sourceLinkKey: "maplink", // Ключ для получения ссылки из JSON
+        sourceRangeName: "Провинции_ОсновнаяИнформация",
+        targetRangeName: "Провинции_ОсновнаяИнформация",
+        priority: 1
+      },
+      // Импорт списка государств
+      {
+        sourceLinkKey: "maplink", // Другой ключ для другой ссылки
+        sourceRangeName: "СписокГосударств_Информация",
+        targetRangeName: "СписокГосударств_Информация",
+        priority: 1
+      },
+      // Импорт списка организаций
+      {
+        sourceLinkKey: "maplink", // Ещё один ключ для ещё одной ссылки
+        sourceRangeName: "СписокОрганизаций_Информация",
+        targetRangeName: "СписокОрганизаций_Информация",
+        priority: 1
+      }
+      // Добавьте сюда больше задач, если необходимо
+    ];
+
+    // Сортировка задач по приоритету
+    importTasks.sort(function(a, b) {
+      return a.priority - b.priority;
+    });
+
+    var openedSpreadsheets = {};
+    var allRangesMatch = true; // Флаг для проверки корректности размеров диапазонов
+
+    // Предварительная проверка размеров диапазонов
+    importTasks.forEach(function(task) {
+      var sourceSpreadsheetUrl = variables.linksJSON[task.sourceLinkKey]; // Получаем ссылку по ключу из JSON
+
+      // Проверяем наличие ссылки
+      if (!sourceSpreadsheetUrl) {
+        var errorMessage = `Ошибка: Ключ '${task.sourceLinkKey}' отсутствует в 'linksJSON'.`;
+        Logger.log(errorMessage);
+        ss.toast(errorMessage, "Ошибка импорта данных");
+        allRangesMatch = false;
+        return; // Пропускаем эту задачу
+      }
+
+      // Кэширование книги
+      if (!openedSpreadsheets[sourceSpreadsheetUrl]) {
+        var cachedSpreadsheetId = cache.get(sourceSpreadsheetUrl);
+        if (cachedSpreadsheetId) {
+          openedSpreadsheets[sourceSpreadsheetUrl] = SpreadsheetApp.openById(cachedSpreadsheetId);
+        } else {
+          openedSpreadsheets[sourceSpreadsheetUrl] = SpreadsheetApp.openByUrl(sourceSpreadsheetUrl);
+          cache.put(sourceSpreadsheetUrl, openedSpreadsheets[sourceSpreadsheetUrl].getId(), 21600); // Кэширование на 6 часов
+        }
+      }
+
+      var sourceSpreadsheet = openedSpreadsheets[sourceSpreadsheetUrl];
+      var sourceRange = sourceSpreadsheet.getRangeByName(task.sourceRangeName);
+      var targetRange = ss.getRangeByName(task.targetRangeName);
+
+      // Проверка существования диапазонов
+      if (!sourceRange) {
+        var errorRange = `Источник: ${task.sourceRangeName}`;
+        var errorMessage = `Ошибка: Исходный диапазон '${task.sourceRangeName}' не найден в таблице по ссылке '${sourceSpreadsheetUrl}'.`;
+        Logger.log(errorMessage);
+        ss.toast(errorMessage, "Ошибка импорта данных");
+        allRangesMatch = false;
+        return;
+      }
+
+      if (!targetRange) {
+        var errorRange = `Цель: ${task.targetRangeName}`;
+        var errorMessage = `Ошибка: Целевой диапазон '${task.targetRangeName}' не найден в текущей таблице.`;
+        Logger.log(errorMessage);
+        ss.toast(errorMessage, "Ошибка импорта данных");
+        allRangesMatch = false;
+        return;
+      }
+
+      var sourceHeight = sourceRange.getHeight();
+      var sourceWidth = sourceRange.getWidth();
+      var targetHeight = targetRange.getHeight();
+      var targetWidth = targetRange.getWidth();
+
+      // Проверка на совпадение размеров диапазонов
+      if (sourceHeight !== targetHeight || sourceWidth !== targetWidth) {
+        var errorMessage = `Ошибка: Размеры исходного (${sourceHeight}x${sourceWidth}) и целевого (${targetHeight}x${targetWidth}) диапазонов не совпадают для задачи с приоритетом ${task.priority}.`;
+        Logger.log(errorMessage);
+        ss.toast(errorMessage, "Ошибка импорта данных");
+        allRangesMatch = false;
+      }
+    });
+
+    // Если размеры всех диапазонов совпадают, выполняем импорт данных
+    if (allRangesMatch) {
+      importTasks.forEach(function(task) {
+        var sourceSpreadsheetUrl = variables.linksJSON[task.sourceLinkKey];
+
+        // Проверяем наличие ссылки
+        if (!sourceSpreadsheetUrl) {
+          // Эта ошибка уже была обработана в предварительной проверке
+          return;
+        }
+
+        var sourceSpreadsheet = openedSpreadsheets[sourceSpreadsheetUrl];
+        var sourceRange = sourceSpreadsheet.getRangeByName(task.sourceRangeName);
+        var targetRange = ss.getRangeByName(task.targetRangeName);
+
+        if (!sourceRange || !targetRange) {
+          // Эти ошибки уже были обработаны в предварительной проверке
+          return;
+        }
+
+        var sourceData = sourceRange.getValues();
+
+        // Записываем данные в целевой диапазон
+        targetRange.setValues(sourceData);
+      });
+    } else {
+      ss.toast("Импорт данных не выполнен из-за несоответствия размеров диапазонов или отсутствия необходимых диапазонов.", "Ошибка");
+    }
+
+    logResult("importNamedRangesInfo", "", (new Date() - startTime) / 1000, "Успешно");
+  } catch (e) {
+    logResult("importNamedRangesInfo", e.toString(), (new Date() - startTime) / 1000, "Ошибка");
+  }
+}
