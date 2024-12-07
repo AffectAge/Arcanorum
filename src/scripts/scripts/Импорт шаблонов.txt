@@ -1,0 +1,202 @@
+function importGeneralTemplates() {
+  var startTime = new Date();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var errorOccurred = false; // Флаг для определения необходимости остановки выполнения
+
+  try {
+    // Именной диапазон, содержащий JSON с ключами и ссылками на книги
+    var variablesRange = 'Переменные_Ссылки';
+    var variablesJson = ss.getRangeByName(variablesRange).getValue();
+    
+    // Преобразуем данные из диапазона в объект
+    var urlMapping;
+    try {
+      urlMapping = JSON.parse(variablesJson);
+    } catch (e) {
+      logResult("importGeneralTemplates", 'Ошибка при парсинге JSON из диапазона ' + variablesRange + ': ' + e, (new Date() - startTime) / 1000, "Ошибка");
+      return; // Прерываем выполнение, если JSON некорректен
+    }
+
+    // Массив с конфигурацией для каждого набора данных
+    var configurations = [
+      {
+        sourceUrlKey: 'maplink', // Ключ для получения URL книги из JSON
+        sourceRangeName: 'Постройки_Шаблоны', // Имя диапазона в книге-источнике
+        targetRangeName: 'Постройки_Шаблоны', // Имя диапазона в целевой книге
+        keysToPreserve: [] // Ключи, которые нужно сохранить
+      },
+      {
+        sourceUrlKey: 'maplink', // Ключ для получения URL книги из JSON
+        sourceRangeName: 'Технологии_Шаблоны', // Имя диапазона в книге-источнике
+        targetRangeName: 'ПеременныеСписки_Технологии', // Имя диапазона в целевой книге
+        keysToPreserve: ['status'] // Ключи, которые нужно сохранить
+      },
+      {
+        sourceUrlKey: 'maplink', // Ключ для получения URL книги из JSON
+        sourceRangeName: 'Законы_Шаблоны', // Имя диапазона в книге-источнике
+        targetRangeName: 'ПеременныеСписки_Законы', // Имя диапазона в целевой книге
+        keysToPreserve: ['status'] // Ключи, которые нужно сохранить
+      }
+      // Можно добавить больше объектов по аналогии
+    ];
+
+    // Объект для группировки конфигураций по ссылкам на книги
+    var groupedConfigurations = {};
+
+    // Перебираем конфигурации и группируем их по ссылкам, полученным из JSON
+    configurations.forEach(function(config) {
+      var sourceUrl = urlMapping[config.sourceUrlKey]; // Извлекаем URL по ключу
+
+      if (sourceUrl !== undefined) {
+        // Если для этой ссылки еще нет группы, создаем её
+        if (!groupedConfigurations.hasOwnProperty(sourceUrl)) {
+          groupedConfigurations[sourceUrl] = [];
+        }
+        // Добавляем конфигурацию в группу
+        groupedConfigurations[sourceUrl].push(config);
+      }
+    });
+
+    // Перебираем сгруппированные конфигурации
+    for (var sourceUrl in groupedConfigurations) {
+      try {
+        var sourceBook = SpreadsheetApp.openByUrl(sourceUrl);
+        var configsForBook = groupedConfigurations[sourceUrl];
+
+        // Для каждой конфигурации, относящейся к текущей книге, выполняем импорт
+        configsForBook.forEach(function(config) {
+          try {
+            importAndMergeTemplates(
+              sourceBook, 
+              config.sourceRangeName, 
+              ss, 
+              config.targetRangeName, 
+              config.keysToPreserve
+            );
+          } catch (e) {
+            logResult("importAndMergeTemplates", 'Ошибка при импорте данных из книги ' + sourceUrl + ': ' + e, (new Date() - startTime) / 1000, "Ошибка");
+            errorOccurred = true; // Устанавливаем флаг ошибки
+          }
+        });
+
+      } catch (e) {
+        logResult("importGeneralTemplates", 'Ошибка при открытии книги по URL: ' + sourceUrl + '. Ошибка: ' + e, (new Date() - startTime) / 1000, "Ошибка");
+        errorOccurred = true; // Устанавливаем флаг ошибки
+        continue; // Продолжаем со следующей книгой, если текущую открыть не удалось
+      }
+    }
+
+    if (!errorOccurred) {
+      logResult("importGeneralTemplates", "", (new Date() - startTime) / 1000, "Успешно");
+    } else {
+      logResult("importGeneralTemplates", "Скрипт завершен с ошибками", (new Date() - startTime) / 1000, "Ошибка");
+    }
+
+  } catch (e) {
+    logResult("importGeneralTemplates", e.toString(), (new Date() - startTime) / 1000, "Ошибка");
+  }
+}
+
+function importAndMergeTemplates(sourceBook, sourceRangeName, targetBook, targetRangeName, keysToPreserve) {
+  // Получаем диапазон из книги-источника
+  var sourceRange = sourceBook.getRangeByName(sourceRangeName);
+  var sourceValues = sourceRange.getValues();
+  
+  // Проверка на наличие данных в диапазоне
+  if (sourceValues.length === 0 || sourceValues[0].length === 0) {
+    Logger.log('Диапазон ' + sourceRangeName + ' в книге ' + sourceBook.getName() + ' не содержит данных.');
+    logResult("importAndMergeTemplates", 'Диапазон ' + sourceRangeName + ' в книге ' + sourceBook.getName() + ' не содержит данных.', 0, "Ошибка");
+    throw new Error('Диапазон ' + sourceRangeName + ' в книге ' + sourceBook.getName() + ' не содержит данных.');
+  }
+
+  // Получаем целевой диапазон
+  var targetRange = targetBook.getRangeByName(targetRangeName);
+  var targetValues = targetRange.getValues();
+  
+  // Проверка на наличие данных в целевом диапазоне
+  if (targetValues.length === 0 || targetValues[0].length === 0) {
+    Logger.log('Диапазон ' + targetRangeName + ' в книге ' + targetBook.getName() + ' не содержит данных.');
+    logResult("importAndMergeTemplates", 'Диапазон ' + targetRangeName + ' в книге ' + targetBook.getName() + ' не содержит данных.', 0, "Ошибка");
+    throw new Error('Диапазон ' + targetRangeName + ' в книге ' + targetBook.getName() + ' не содержит данных.');
+  }
+
+  // Преобразуем данные из книги-источника в словарь
+  var sourceData = {};
+  for (var i = 0; i < sourceValues.length; i++) {
+    var jsonStr = sourceValues[i][0];
+    if (jsonStr) {
+      try {
+        var techData = JSON.parse(jsonStr);
+        if (techData && techData.name) { // Проверяем, что свойство name существует
+          var techName = techData.name;
+          sourceData[techName] = techData;
+        } else {
+          Logger.log('Некорректный формат JSON в строке ' + (i + 1) + ': ' + jsonStr);
+          logResult("importAndMergeTemplates", 'Некорректный формат JSON в строке ' + (i + 1) + ': ' + jsonStr, 0, "Ошибка");
+        }
+      } catch (e) {
+        Logger.log('Ошибка при парсинге JSON в книге-источнике, строка ' + (i + 1) + ': ' + e);
+        logResult("importAndMergeTemplates", 'Ошибка при парсинге JSON в книге-источнике, строка ' + (i + 1) + ': ' + e, 0, "Ошибка");
+        continue;
+      }
+    }
+  }
+  
+  // Преобразуем данные из целевой книги в словарь
+  var targetData = {};
+  for (var i = 0; i < targetValues.length; i++) {
+    var jsonStr = targetValues[i][0];
+    if (jsonStr) {
+      try {
+        var techData = JSON.parse(jsonStr);
+        if (techData && techData.name) { // Проверяем, что свойство name существует
+          var techName = techData.name;
+          targetData[techName] = {
+            data: techData,
+            rowIndex: i
+          };
+        } else {
+          Logger.log('Некорректный формат JSON в строке ' + (i + 1) + ': ' + jsonStr);
+          logResult("importAndMergeTemplates", 'Некорректный формат JSON в строке ' + (i + 1) + ': ' + jsonStr, 0, "Ошибка");
+        }
+      } catch (e) {
+        Logger.log('Ошибка при парсинге JSON в целевой книге, строка ' + (i + 1) + ': ' + e);
+        logResult("importAndMergeTemplates", 'Ошибка при парсинге JSON в целевой книге, строка ' + (i + 1) + ': ' + e, 0, "Ошибка");
+        continue;
+      }
+    }
+  }
+  
+  var updatedValues = [];
+  
+  // Обрабатываем данные из книги-источника
+  for (var techName in sourceData) {
+    var sourceTechData = sourceData[techName];
+    
+    if (targetData.hasOwnProperty(techName)) {
+      // Технология существует в целевой книге
+      var targetTechData = targetData[techName].data;
+      
+      // Сохраняем указанные ключи из целевой книги
+      keysToPreserve.forEach(function(key) {
+        if (targetTechData.hasOwnProperty(key)) { // Изменено: убрана вложенность в проверке
+          sourceTechData[key] = targetTechData[key];
+        }
+      });
+      
+      updatedValues.push([JSON.stringify(sourceTechData)]);
+      delete targetData[techName];
+    } else {
+      // Новая технология, добавляем ее
+      updatedValues.push([JSON.stringify(sourceTechData)]);
+    }
+  }
+  
+  // Очищаем старый диапазон и устанавливаем новые значения
+  targetRange.clearContent();
+  
+  var numRows = updatedValues.length;
+  var numCols = 1;
+  var newRange = targetRange.offset(0, 0, numRows, numCols);
+  newRange.setValues(updatedValues);
+}
