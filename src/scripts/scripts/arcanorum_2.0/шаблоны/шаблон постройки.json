@@ -1,0 +1,15 @@
+{
+"name":"Кирпичный завод",
+"required_landscapes":{
+  "AND": [
+    "FOREST",
+    {
+      "OR": ["MOUNTAIN", "RIVER"]
+    }
+  ]
+},
+"required_planet":{"OR":["Mars","Moon"]},
+"required_population":{"GREATER_THAN":1000},
+"matching_provinces_state":["1"],
+"matching_provinces_others":["2"]
+}
