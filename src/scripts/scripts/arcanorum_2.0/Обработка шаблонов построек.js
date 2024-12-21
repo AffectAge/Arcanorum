@@ -40,8 +40,8 @@ function scanNamedRanges() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = spreadsheet.getActiveSheet(); // Получаем активный лист
   
-  // Список именованных диапазонов, которые нужно прочитать (исключаем Range4)
-  const namedRanges = ['Range1', 'Range2', 'Range3'];
+  // Список именованных диапазонов, которые нужно прочитать (исключаем Журнал_Событий)
+  const namedRanges = ['Переменные_Основные', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация'];
   
   // Объект для хранения данных из диапазонов
   let data = {};
@@ -71,12 +71,12 @@ function processTurn(data, sheet, spreadsheet) {
   // Вызов функции для парсинга и обработки JSON данных
   const { updatedData, newMessages } = processJsonData(data, sheet, spreadsheet);
   
-  // Добавление новых сообщений в Range4 с учетом лимита и категорий
+  // Добавление новых сообщений в Журнал_Событий с учетом лимита и категорий
   if (newMessages.length > 0) {
     addMessagesToRange4(newMessages, spreadsheet);
   }
   
-  // После обработки данных передаем их в функцию для записи (исключая Range4)
+  // После обработки данных передаем их в функцию для записи (исключая Журнал_Событий)
   updateRanges(updatedData, spreadsheet);
 }
 
@@ -88,25 +88,25 @@ function processTurn(data, sheet, spreadsheet) {
  * @returns {Object} - Объект с обновленными данными и новыми сообщениями
  */
 function processJsonData(data, sheet, spreadsheet) {
-  const range1Data = data['Range1'];
-  const range2Data = data['Range2'];
-  const range3Data = data['Range3'];
+  const range1Data = data['Переменные_Основные'];
+  const range2Data = data['Постройки_Шаблоны'];
+  const range3Data = data['Провинции_ОсновнаяИнформация'];
   
   // Объект для хранения обновленных данных
   let updatedData = JSON.parse(JSON.stringify(data)); // Глубокое копирование
   let newMessages = []; // Массив для хранения новых сообщений
   
-  // Проверяем наличие данных в Range1
+  // Проверяем наличие данных в Переменные_Основные
   if (!range1Data || range1Data.length === 0 || !range1Data[0][0]) {
-    Logger.log('Range1 пуст или не содержит данных.');
+    Logger.log('Переменные_Основные пуст или не содержит данных.');
     return { updatedData, newMessages }; // Возвращаем без изменений
   }
   
-  // Парсим JSON из первой ячейки Range1 и получаем state_name
+  // Парсим JSON из первой ячейки Переменные_Основные и получаем state_name
   let stateName;
   try {
     const rawData = range1Data[0][0];
-    Logger.log(`Содержимое Range1, первая ячейка: "${rawData}"`);
+    Logger.log(`Содержимое Переменные_Основные, первая ячейка: "${rawData}"`);
     
     // Извлечение JSON с помощью регулярного выражения
     const jsonMatch = rawData.match(/\{.*\}/);
@@ -115,42 +115,42 @@ function processJsonData(data, sheet, spreadsheet) {
       stateName = range1Json.state_name;
       Logger.log(`Извлечён state_name: "${stateName}"`);
       if (!stateName) {
-        Logger.log('Ключ "state_name" не найден в Range1.');
+        Logger.log('Ключ "state_name" не найден в Переменные_Основные.');
         return { updatedData, newMessages };
       }
     } else {
-      throw new Error('Не удалось извлечь JSON из содержимого Range1.');
+      throw new Error('Не удалось извлечь JSON из содержимого Переменные_Основные.');
     }
   } catch (e) {
-    Logger.log(`Ошибка при парсинге JSON из Range1: ${e}`);
+    Logger.log(`Ошибка при парсинге JSON из Переменные_Основные: ${e}`);
     return { updatedData, newMessages };
   }
   
-  // Парсим все JSON из Range2 (шаблоны) без фильтрации по owner
+  // Парсим все JSON из Постройки_Шаблоны (шаблоны) без фильтрации по owner
   const templates = [];
   for (let i = 0; i < range2Data.length; i++) {
     const cell = range2Data[i][0];
     if (cell) {
       try {
         const template = JSON.parse(cell);
-        Logger.log(`Парсинг Range2, строка ${i+1}: ${JSON.stringify(template)}`);
+        Logger.log(`Парсинг Постройки_Шаблоны, строка ${i+1}: ${JSON.stringify(template)}`);
         templates.push({ 
           data: template, 
           row: i 
         });
       } catch (e) {
-        Logger.log(`Ошибка при парсинге JSON из Range2, строка ${i+1}: ${e}`);
+        Logger.log(`Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${i+1}: ${e}`);
         // Игнорируем ошибку и продолжаем
       }
     }
   }
   
   if (templates.length === 0) {
-    Logger.log('Нет корректных шаблонов в Range2 для обработки.');
+    Logger.log('Нет корректных шаблонов в Постройки_Шаблоны для обработки.');
     return { updatedData, newMessages };
   }
   
-  // Парсим все JSON из Range3 и создаем карту id -> province
+  // Парсим все JSON из Провинции_ОсновнаяИнформация и создаем карту id -> province
   const provinceMap = {};
   const allProvinces = [];
   for (let i = 0; i < range3Data.length; i++) {
@@ -168,7 +168,7 @@ function processJsonData(data, sheet, spreadsheet) {
         jsonString = jsonString.replace(/""/g, '"');
         
         const province = JSON.parse(jsonString);
-        Logger.log(`Парсинг Range3, строка ${i+1}: ${JSON.stringify(province)}`);
+        Logger.log(`Парсинг Провинции_ОсновнаяИнформация, строка ${i+1}: ${JSON.stringify(province)}`);
         if (province.id) {
           // Автоматическое преобразование полей, использующих evaluateTextCriteria
           TEXT_CRITERIA_KEYS.forEach(key => {
@@ -191,7 +191,7 @@ function processJsonData(data, sheet, spreadsheet) {
           allProvinces.push(province);
         }
       } catch (e) {
-        Logger.log(`Ошибка при парсинге JSON из Range3, строка ${i+1}: ${e}`);
+        Logger.log(`Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${i+1}: ${e}`);
         // Игнорируем ошибку и продолжаем
       }
     }
@@ -282,7 +282,7 @@ function processJsonData(data, sheet, spreadsheet) {
     }
     
     // Сериализуем обновленный шаблон обратно в JSON
-    updatedData['Range2'][templateInfo.row][0] = JSON.stringify(template);
+    updatedData['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
   });
   
   return { updatedData, newMessages };
@@ -403,12 +403,12 @@ function enforceTotalMessageLimit(finalMessages) {
 }
 
 /**
- * Вспомогательная функция для добавления сообщений в Range4 с учетом общего лимита и группировки по категориям
+ * Вспомогательная функция для добавления сообщений в Журнал_Событий с учетом общего лимита и группировки по категориям
  * @param {Array} messagesToAdd - Массив новых сообщений для добавления
  * @param {Spreadsheet} spreadsheet - Объект активной таблицы
  */
 function addMessagesToRange4(messagesToAdd, spreadsheet) {
-  const rangeName = 'Range4';
+  const rangeName = 'Журнал_Событий';
   
   const range = spreadsheet.getRangeByName(rangeName);
   if (!range) {
@@ -416,15 +416,17 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
     return;
   }
   
-  const sheet = range.getSheet(); // Получаем лист, на котором находится Range4
+  const sheet = range.getSheet(); // Получаем лист, на котором находится Журнал_Событий
   
-  // Получаем существующие сообщения из Range4
+  range.clearContent(); // Очищаем Журнал_Событий перед записью новых данных
+  
+  // Получаем существующие сообщения из Журнал_Событий
   const existingData = range.getValues(); // Двумерный массив
   const existingMessages = existingData
     .flat() // Преобразуем двумерный массив в одномерный
     .filter(msg => msg && msg.toString().trim() !== ''); // Убираем пустые ячейки
   
-  Logger.log(`Текущее количество сообщений в Range4: ${existingMessages.length}`);
+  Logger.log(`Текущее количество сообщений в Журнал_Событий: ${existingMessages.length}`);
   
   // Разбиваем существующие сообщения на категории
   const categorizedExistingMessages = categorizeMessages(existingMessages);
@@ -444,10 +446,8 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
   // Преобразуем массив сообщений в двумерный массив для записи
   const messagesForSheet = limitedFinalMessages.map(msg => [msg]);
   
-  // Записываем обновленные сообщения обратно в Range4
-  range.clearContent(); // Очищаем Range4 перед записью новых данных
-  
-  // Проверяем, достаточно ли строк в Range4 для записи
+  // Записываем обновленные сообщения обратно в Журнал_Событий
+  // Проверяем, достаточно ли строк в Журнал_Событий для записи
   const numRowsToWrite = messagesForSheet.length;
   const maxRows = range.getNumRows();
   
@@ -455,14 +455,14 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
     // Если строк недостаточно, расширяем диапазон
     const newRange = sheet.getRange(range.getRow(), range.getColumn(), numRowsToWrite, 1);
     newRange.setValues(messagesForSheet);
-    Logger.log(`Range4 расширен до ${numRowsToWrite} строк и обновлён.`);
+    Logger.log(`Журнал_Событий расширен до ${numRowsToWrite} строк и обновлён.`);
   } else {
     // Иначе записываем только необходимые строки
     range.offset(0, 0, numRowsToWrite, 1).setValues(messagesForSheet);
-    Logger.log(`Range4 обновлен с ${messagesForSheet.length} сообщениями.`);
+    Logger.log(`Журнал_Событий обновлен с ${messagesForSheet.length} сообщениями.`);
   }
   
-  // Включаем перенос текста (Wrap Text) для Range4, чтобы отображались переводы строк
+  // Включаем перенос текста (Wrap Text) для Журнал_Событий, чтобы отображались переводы строк
   range.setWrap(true);
   Logger.log(`Перенос текста включён для ${rangeName}.`);
 }
@@ -475,9 +475,9 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
 function updateRanges(updatedData, spreadsheet) {
   for (const rangeName in updatedData) {
     if (updatedData.hasOwnProperty(rangeName)) {
-      // Исключаем Range4 из обновления
-      if (rangeName === 'Range4') {
-        Logger.log(`Пропуск Range4 при обновлении данных.`);
+      // Исключаем Журнал_Событий из обновления
+      if (rangeName === 'Журнал_Событий') {
+        Logger.log(`Пропуск Журнал_Событий при обновлении данных.`);
         continue;
       }
       
