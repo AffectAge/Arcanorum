@@ -1,5 +1,6 @@
 {
 "name":"Кирпичный завод",
+"owner":"Украина",
 "required_landscapes":{
   "AND": [
     "FOREST",
@@ -11,5 +12,7 @@
 "required_planet":{"OR":["Mars","Moon"]},
 "required_population":{"GREATER_THAN":1000},
 "matching_provinces_state":["1"],
-"matching_provinces_others":["2"]
+"matching_provinces_others":["2"],
+"allowed_building_state":[],
+"allowed_building_others":["Провинция-Альфа"]
 }
