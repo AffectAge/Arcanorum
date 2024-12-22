@@ -1,39 +1,4 @@
 /**
- * Максимальные ограничения
- */
-const MAX_TOTAL_MESSAGES = 1000;        // Общий лимит сообщений
-const MAX_CHARACTERS_PER_CELL = 50000;  // Лимит символов на ячейку
-
-/**
- * Массив объектов для проверки дополнительных условий
- */
-const CHECK_FIELDS = [
-  {
-    buildingKey: 'required_landscapes', // Ключ из шаблона постройки
-    provinceKey: 'landscapes',           // Соответствующий ключ из провинции
-    evaluator: evaluateTextCriteria      // Функция для оценки условия
-  },
-  {
-    buildingKey: 'required_planet',     // Ключ из шаблона постройки
-    provinceKey: 'planet',               // Соответствующий ключ из провинции
-    evaluator: evaluateTextCriteria      // Функция для оценки условия
-  },
-  {
-    buildingKey: 'required_rad',
-    provinceKey: 'rad',
-    evaluator: evaluateNumberCriteria     // Функция для оценки условия
-  }
-  // Добавляйте новые условия по мере необходимости
-];
-
-/**
- * Массив ключей провинции, использующих evaluateTextCriteria
- */
-const TEXT_CRITERIA_KEYS = CHECK_FIELDS
-  .filter(field => field.evaluator === evaluateTextCriteria)
-  .map(field => field.provinceKey);
-
-/**
  * Основная функция для чтения, обработки и записи данных
  */
 function scanNamedRanges() {
@@ -41,7 +6,7 @@ function scanNamedRanges() {
   const sheet = spreadsheet.getActiveSheet(); // Получаем активный лист
   
   // Список именованных диапазонов, которые нужно прочитать (исключаем Журнал_Событий)
-  const namedRanges = ['Переменные_Основные', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация'];
+  const namedRanges = ['Переменные_Основные', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация', 'Постройки_ОсновнаяИнформация'];
   
   // Объект для хранения данных из диапазонов
   let data = {};

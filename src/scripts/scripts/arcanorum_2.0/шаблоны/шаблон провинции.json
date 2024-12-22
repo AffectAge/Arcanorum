@@ -1,40 +1,6 @@
 {
   "id": "1",
-  "province_owner": "Украина",
-  "landscapes": ["Desert", "Mountain", "Forest"]
+  "owner": "Украина",
+  "landscapes": ["FOREST", "MOUNTAIN", "Forest"],
+  "planet": ["Moon", "Mountain", "Forest"]
 }
-
-
-  "area": 10000,
-  "buildings_slots": {
-      "total": 10,
-      "used": 5,
-      "free": 5
-  },
-  "agriculture_area": {
-      "total": 200000,
-      "used": 77000,
-      "free": 123000
-  },
-  "terrain": {
-    "landscapes": ["forest", "mountain"],
-    "climates": ["temperate"]
-  },
-  "resources": {
-    "wood": 200000,
-    "energy": 77000,
-    "stone": 500000
-  },
-  "location": {
-    "continent": "continent_1",
-    "planet": "planet_earth"
-  },
-  "population": {
-    "culture": "culture_a",
-	"race": "race_x",
-    "religion": "religion_1"
-  },
-  "environment": {
-    "radiation_level": 45,
-    "pollution_level": 55
-  }

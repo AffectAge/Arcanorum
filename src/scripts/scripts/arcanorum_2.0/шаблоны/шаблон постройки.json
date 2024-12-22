@@ -1,6 +1,7 @@
 {
 "name":"Кирпичный завод",
 "owner":"Украина",
+"province_limit": 5,
 "required_landscapes":{
   "AND": [
     "FOREST",
