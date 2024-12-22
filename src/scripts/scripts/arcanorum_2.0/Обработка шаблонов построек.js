@@ -243,6 +243,10 @@ function processJsonData(data, sheet, spreadsheet) {
     // Добавляем результаты в шаблон
     template.matching_provinces_state = matchingProvincesState;
     template.matching_provinces_others = matchingProvincesOthers;
+
+    // Добавляем новые ключи с той же информацией
+    template.allowed_building_state = matchingProvincesState;
+    template.allowed_building_others = matchingProvincesOthers;
     
     Logger.log(`Шаблон из строки ${templateInfo.row + 1} обновлён с matching_provinces_state: ${matchingProvincesState}, matching_provinces_others: ${matchingProvincesOthers}`);
     
