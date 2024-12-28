@@ -45,15 +45,13 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
   const range2Data = data['Постройки_Шаблоны'];
   const range3Data = data['Провинции_ОсновнаяИнформация'];
   
-  // Объект для хранения обновленных данных
-  let updatedData = JSON.parse(JSON.stringify(data)); // Глубокое копирование
   let newMessages = []; // Массив для хранения новых сообщений
   
   // Проверяем наличие данных в Переменные_Основные
   if (!range1Data || range1Data.length === 0 || !range1Data[0][0]) {
     const errorMsg = 'Переменные_Основные пуст или не содержит данных.';
     newMessages.push(`[Ошибка] ${errorMsg}`);
-    return { updatedData, newMessages }; // Возвращаем без изменений
+    return newMessages; // Возвращаем без изменений
   }
   
   // Парсим JSON из первой ячейки Переменные_Основные и получаем state_name
@@ -69,7 +67,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
       if (!stateName) {
         const errorMsg = 'Ключ "state_name" не найден в Переменные_Основные.';
         newMessages.push(`[Ошибка] ${errorMsg}`);
-        return { updatedData, newMessages };
+        return newMessages;
       }
     } else {
       throw new Error('Не удалось извлечь JSON из содержимого Переменные_Основные.');
@@ -77,7 +75,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
   } catch (e) {
     const errorMsg = `Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`;
     newMessages.push(`[Ошибка] ${errorMsg}`);
-    return { updatedData, newMessages };
+    return newMessages;
   }
   
   // Парсим все JSON из Постройки_Шаблоны (шаблоны) без фильтрации по owner
@@ -102,7 +100,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
   if (templates.length === 0) {
     const errorMsg = 'Нет корректных шаблонов в Постройки_Шаблоны для обработки.';
     newMessages.push(`[Ошибка] ${errorMsg}`);
-    return { updatedData, newMessages };
+    return newMessages;
   }
   
   // Парсим все JSON из Провинции_ОсновнаяИнформация и создаем карту id -> province
@@ -232,10 +230,10 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
     }
     
     // Сериализуем обновленный шаблон обратно в JSON
-    updatedData['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+    data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
   });
   
-  return { updatedData, newMessages };
+  return newMessages;
 }
 
 /**

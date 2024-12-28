@@ -43,26 +43,39 @@ function scanNamedRanges() {
  * @param {Sheet} sheet - Активный лист
  * @param {Spreadsheet} spreadsheet - Активная таблица
  */
+/**
+ * Функция для обработки данных и вызова необходимых подфункций
+ * @param {Object} data - Объект с данными из именованных диапазонов
+ * @param {Sheet} sheet - Активный лист
+ * @param {Spreadsheet} spreadsheet - Активная таблица
+ */
 function processTurn(data, sheet, spreadsheet) {
+  let allNewMessages = [];
+  
   try {
     // Вызов функции для парсинга и обработки JSON данных
-    const { updatedData, newMessages } = processBuildingsCriterias(data, sheet, spreadsheet);
+    const newMessages1 = processBuildingsCriterias(data, sheet, spreadsheet);
+    allNewMessages = allNewMessages.concat(newMessages1);
     
-    // Добавление новых сообщений в Журнал_Событий с учетом лимита и категорий
-    if (newMessages.length > 0) {
-      addMessagesToRange4(newMessages, spreadsheet);
+    // Проверка типов сообщений перед добавлением
+    allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
+    
+    // Добавление всех новых сообщений в Журнал_Событий
+    if (allNewMessages.length > 0) {
+      addMessagesToRange4(allNewMessages, spreadsheet);
     }
     
-    // После обработки данных передаем их в функцию для записи (исключая Журнал_Событий)
-    updateRanges(updatedData, spreadsheet);
+    // После обработки данных передаём их в функцию для записи (исключая Журнал_Событий)
+    updateRanges(data, spreadsheet);
     
   } catch (error) {
     // Добавление сообщения об ошибке в Журнал_Событий
     const errorMessage = `[Ошибка] processTurn: ${error.message}`;
     addMessagesToRange4([errorMessage], spreadsheet);
-    // Дополнительная обработка ошибки при необходимости
   }
 }
+
+
 
 
 
