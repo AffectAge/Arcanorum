@@ -27,29 +27,9 @@
 ]
 },
 {
-"NOT": ["military_base"]
-},
-{
 "MIN_COUNT": {
 "farm": 2
 }
-},
-{
-"MAX_COUNT": {
-"lumber_mill": 1
-}
-},
-{
-"XNOR": [
-"temple",
-"monument"
-]
-},
-{
-"IMPLIES": [
-"castle",
-"barracks"
-]
 }
 ]
 }
