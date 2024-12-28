@@ -57,8 +57,8 @@ function processTurn(data, sheet, spreadsheet) {
     const newMessages1 = processBuildingsCriterias(data, sheet, spreadsheet);
     allNewMessages = allNewMessages.concat(newMessages1);
 
-    // Вызов функции для обработки ограничений провинций
-    const newMessages2 = processProvinceLimits(data, sheet, spreadsheet);
+    // Вызов функции для обновления списков matching_provinces_state и matching_provinces_others
+    const newMessages2 = updateMatchingProvinces(data, spreadsheet);
     allNewMessages = allNewMessages.concat(newMessages2);
 
     // Вызов функции для обработки ограничений провинций
@@ -68,6 +68,10 @@ function processTurn(data, sheet, spreadsheet) {
     // Вызов функции для обработки ограничений построек по государственному лимиту
     const newMessages4 = processStateLimits(data, sheet, spreadsheet);
     allNewMessages = allNewMessages.concat(newMessages4);
+
+    // Вызов функции для обработки ограничений провинций
+    const newMessages5 = processProvinceLimits(data, sheet, spreadsheet);
+    allNewMessages = allNewMessages.concat(newMessages5);
     
     // Проверка типов сообщений перед добавлением
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');

@@ -17,5 +17,40 @@
 "matching_provinces_state":["1"],
 "matching_provinces_others":["2"],
 "allowed_building_state":[],
-"allowed_building_others":["Провинция-Альфа"]
+"allowed_building_others":["Провинция-Альфа"],
+"province_required_buildings": {
+"AND": [
+{
+"OR": [
+"farm",
+"mine"
+]
+},
+{
+"NOT": ["military_base"]
+},
+{
+"MIN_COUNT": {
+"farm": 2
+}
+},
+{
+"MAX_COUNT": {
+"lumber_mill": 1
+}
+},
+{
+"XNOR": [
+"temple",
+"monument"
+]
+},
+{
+"IMPLIES": [
+"castle",
+"barracks"
+]
+}
+]
+}
 }
