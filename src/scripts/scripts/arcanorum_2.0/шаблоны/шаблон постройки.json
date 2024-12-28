@@ -32,5 +32,9 @@
 }
 }
 ]
+},
+"state_required_buildings": {
+"MIN_COUNT": { "farm": 5 },
+"MAX_COUNT": { "mine": 3 }
 }
 }

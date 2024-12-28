@@ -58,8 +58,12 @@ function processTurn(data, sheet, spreadsheet) {
     allNewMessages = allNewMessages.concat(newMessages1);
 
     // Вызов функции для обновления списков matching_provinces_state и matching_provinces_others
-    const newMessages2 = updateMatchingProvinces(data, spreadsheet);
+    const newMessages2 = updateProvinceRequiredBuildings(data, spreadsheet);
     allNewMessages = allNewMessages.concat(newMessages2);
+
+    // Вызов функции для обновления списков matching_provinces_state и matching_provinces_others
+    const newMessages21 = updateStateRequiredBuildings(data, spreadsheet);
+    allNewMessages = allNewMessages.concat(newMessages21);
 
     // Вызов функции для обработки ограничений провинций
     const newMessages3 = processWorldLimits(data, sheet, spreadsheet);
