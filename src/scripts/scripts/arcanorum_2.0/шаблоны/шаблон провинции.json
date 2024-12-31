@@ -2,5 +2,11 @@
   "id": "1",
   "owner": "Украина",
   "landscapes": ["FOREST", "MOUNTAIN", "Forest"],
-  "planet": ["Moon", "Mountain", "Forest"]
+  "planet": ["Moon", "Mountain", "Forest"],
+  "province_culture": [],
+  "province_religion": [],
+  "province_climate": [],
+  "province_radiation": [],
+  "province_pollution": [],
+  "province_stability": []
 }

@@ -13,6 +13,21 @@ const CHECK_FIELDS = [
     evaluator: evaluateTextCriteria  
   },
   {
+    buildingKey: 'required_culture',     
+    provinceKey: 'province_culture',               
+    evaluator: evaluateTextCriteria  
+  },
+  {
+    buildingKey: 'required_religion',     
+    provinceKey: 'province_religion',               
+    evaluator: evaluateTextCriteria  
+  },
+  {
+    buildingKey: 'required_climate',     
+    provinceKey: 'province_climate',               
+    evaluator: evaluateTextCriteria  
+  },
+  {
     buildingKey: 'required_radiation',
     provinceKey: 'province_radiation',
     evaluator: evaluateNumberCriteria
@@ -23,7 +38,7 @@ const CHECK_FIELDS = [
     evaluator: evaluateNumberCriteria
   },
   {
-    buildingKey: 'required_province_stability',
+    buildingKey: 'required_stability',
     provinceKey: 'province_stability',
     evaluator: evaluateNumberCriteria
   }
@@ -206,7 +221,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
     
     if (matchingProvincesState.length > 0 || matchingProvincesOthers.length > 0) {
       // Если есть подходящие провинции, генерируем сообщение о возможностях
-      let message = `[Постройки]\nПостройка ${constructionName}, принадлежащая ${constructionOwner}, может быть построена:`;
+      let message = `[Постройки критерии]\nПостройка ${constructionName}, принадлежащая ${constructionOwner}, может быть построена:`;
       
       if (matchingProvincesState.length > 0) {
         const provincesStateList = matchingProvincesState.join(', ');
@@ -229,7 +244,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
       });
       const reasonsText = reasons.join(' или ');
       
-      const message = `[Постройки]\nПостройка ${constructionName}, принадлежащая ${constructionOwner}, не подходит ни для одной провинции нашего государства или других государств, из-за неподходящего ${reasonsText}.`;
+      const message = `[Постройки критерии]\nПостройка ${constructionName}, принадлежащая ${constructionOwner}, не подходит ни для одной провинции нашего государства или других государств, из-за неподходящего ${reasonsText}.`;
       newMessages.push(message);
     }
     

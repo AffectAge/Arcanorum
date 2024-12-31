@@ -1,5 +1,5 @@
 {
-"name":"Кирпичный завод",
+"name":"Сталетейный завод",
 "owner":"Украина",
 "province_limit":10,
 "world_limit":40,
@@ -12,8 +12,14 @@
     }
   ]
 },
-"required_planet":{"OR":["Mars","Moon"]},
-"required_population":{"GREATER_THAN":1000},
+"required_planet":{},
+"required_culture":{},
+"required_religion":{},
+"required_climate":{},
+"required_radiation":{},
+"required_pollution":{},
+"required_stability":{},
+"required_population":{},
 "matching_provinces_state":["1"],
 "matching_provinces_others":["2"],
 "allowed_building_state":[],
@@ -34,7 +40,7 @@
 ]
 },
 "state_required_buildings": {
-"MIN_COUNT": { "farm": 5 },
+"MIN_COUNT": { "farm": 1 },
 "MAX_COUNT": { "mine": 3 }
 }
 }
