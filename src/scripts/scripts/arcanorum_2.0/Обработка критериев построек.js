@@ -8,14 +8,24 @@ const CHECK_FIELDS = [
     evaluator: evaluateTextCriteria      // Функция для оценки условия
   },
   {
-    buildingKey: 'required_planet',     // Ключ из шаблона постройки
-    provinceKey: 'planet',               // Соответствующий ключ из провинции
-    evaluator: evaluateTextCriteria      // Функция для оценки условия
+    buildingKey: 'required_planet',     
+    provinceKey: 'planet',               
+    evaluator: evaluateTextCriteria  
   },
   {
-    buildingKey: 'required_rad',
-    provinceKey: 'rad',
-    evaluator: evaluateNumberCriteria     // Функция для оценки условия
+    buildingKey: 'required_radiation',
+    provinceKey: 'province_radiation',
+    evaluator: evaluateNumberCriteria
+  },
+  {
+    buildingKey: 'required_pollution',
+    provinceKey: 'province_pollution',
+    evaluator: evaluateNumberCriteria
+  },
+  {
+    buildingKey: 'required_province_stability',
+    provinceKey: 'province_stability',
+    evaluator: evaluateNumberCriteria
   }
   // Добавляйте новые условия по мере необходимости
 ];
