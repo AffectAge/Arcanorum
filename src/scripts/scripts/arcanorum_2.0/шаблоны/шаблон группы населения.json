@@ -1,0 +1,56 @@
+{
+  "pops": [
+    {
+      "province_id": "3",
+      "demographics": {
+        "total_population": 12000,
+		"culture": "anglo",
+        "religion": "protestant",
+        "gender_ratio": {
+          "male": 6000,
+          "female": 6000
+        }
+      },
+      "employment": {
+        "total_workers": 7000,
+        "employed_workers": 6500,
+        "unemployed_workers": 500,
+        "professions": {
+          "инженеры": 2500,
+          "учителя": 2000,
+          "медики": 2500
+        }
+      },
+      "wealth": {
+        "money": 25000
+      },
+      "political": {
+        "radicals": 600,
+        "loyalists": 4000,
+        "neutral": 3500
+      },
+      "interest_groups": {
+        "традиционалисты": {
+          "radicals": 300,
+          "loyalists": 2000,
+          "neutral": 1700
+        },
+        "промышленники": {
+          "radicals": 200,
+          "loyalists": 1800,
+          "neutral": 1000
+        },
+        "интеллигенция": {
+          "radicals": 150,
+          "loyalists": 1500,
+          "neutral": 850
+        },
+        "землевладельцы": {
+          "radicals": 100,
+          "loyalists": 900,
+          "neutral": 700
+        }
+      }
+    }
+  ]
+}
