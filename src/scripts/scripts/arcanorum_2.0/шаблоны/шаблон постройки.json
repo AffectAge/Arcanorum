@@ -4,6 +4,7 @@
 "province_limit":10,
 "world_limit":40,
 "state_limit":2,
+"required_arable_land":0,
 "required_landscapes":{
   "AND": [
     "FOREST",
