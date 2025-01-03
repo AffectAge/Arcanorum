@@ -6,7 +6,7 @@ function scanNamedRanges() {
   const sheet = spreadsheet.getActiveSheet(); // Получаем активный лист
   
   // Список именованных диапазонов, которые нужно прочитать (исключаем Журнал_Событий)
-  const namedRanges = ['Переменные_Основные', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация', 'Постройки_ОсновнаяИнформация'];
+  const namedRanges = ['Переменные_Основные', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация', 'Постройки_ОсновнаяИнформация', 'Население_ОсновнаяИнформация'];
   
   // Объект для хранения данных из диапазонов
   let data = {};
@@ -76,6 +76,10 @@ function processTurn(data, sheet, spreadsheet) {
     // Вызов функции для обработки ограничений провинций
     const newMessages5 = processProvinceLimits(data, sheet, spreadsheet);
     allNewMessages = allNewMessages.concat(newMessages5);
+
+    // Вызов функции для обработки ограничений провинций
+    const newMessages6 = aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadsheet);
+    allNewMessages = allNewMessages.concat(newMessages6);
     
     // Проверка типов сообщений перед добавлением
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');

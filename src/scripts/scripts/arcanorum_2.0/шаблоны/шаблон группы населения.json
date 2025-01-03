@@ -2,10 +2,10 @@
   "pops": [
     {
       "province_id": "3",
+	  "culture": "anglo",
+      "religion": "protestant",
       "demographics": {
         "total_population": 12000,
-		"culture": "anglo",
-        "religion": "protestant",
         "gender_ratio": {
           "male": 6000,
           "female": 6000
