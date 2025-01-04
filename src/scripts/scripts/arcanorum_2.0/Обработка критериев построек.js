@@ -69,7 +69,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
   // Проверяем наличие данных в Переменные_Основные
   if (!range1Data || range1Data.length === 0 || !range1Data[0][0]) {
     const errorMsg = 'Переменные_Основные пуст или не содержит данных.';
-    newMessages.push(`[Ошибка] ${errorMsg}`);
+    newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
     return newMessages; // Возвращаем без изменений
   }
   
@@ -85,7 +85,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
       stateName = range1Json.state_name;
       if (!stateName) {
         const errorMsg = 'Ключ "state_name" не найден в Переменные_Основные.';
-        newMessages.push(`[Ошибка] ${errorMsg}`);
+        newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
         return newMessages;
       }
     } else {
@@ -93,7 +93,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
     }
   } catch (e) {
     const errorMsg = `Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`;
-    newMessages.push(`[Ошибка] ${errorMsg}`);
+    newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
     return newMessages;
   }
   
@@ -110,7 +110,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
         });
       } catch (e) {
         const errorMsg = `Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${i+1}: ${e.message}`;
-        newMessages.push(`[Ошибка] ${errorMsg}`);
+        newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
         // Игнорируем ошибку и продолжаем
       }
     }
@@ -118,7 +118,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
   
   if (templates.length === 0) {
     const errorMsg = 'Нет корректных шаблонов в Постройки_Шаблоны для обработки.';
-    newMessages.push(`[Ошибка] ${errorMsg}`);
+    newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
     return newMessages;
   }
   
@@ -161,7 +161,7 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
         }
       } catch (e) {
         const errorMsg = `Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${i+1}: ${e.message}`;
-        newMessages.push(`[Ошибка] ${errorMsg}`);
+        newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
         // Игнорируем ошибку и продолжаем
       }
     }
@@ -175,9 +175,18 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
     const matchingProvincesState = [];
     const matchingProvincesOthers = [];
     
+    // Объект для отслеживания, какие критерии удовлетворяются хотя бы одной провинцией
+    const criteriaSatisfied = {};
+    CHECK_FIELDS.forEach(checkField => {
+      criteriaSatisfied[checkField.buildingKey] = false;
+    });
+    
     // Проходим по каждой провинции и проверяем условия
     allProvinces.forEach(province => {
       let allConditionsMet = true;
+      
+      // Переменная для отслеживания, какие критерии не выполнены для этой провинции
+      // Можно использовать, если нужно детализировать по провинциям
       
       // Проходим по каждому условию из CHECK_FIELDS
       CHECK_FIELDS.forEach(checkField => {
@@ -187,6 +196,14 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
         if (buildingCondition !== undefined && buildingCondition !== null) {
           // Если условие определено, оцениваем его
           const result = checkField.evaluator(buildingCondition, provinceValue);
+          
+          if (result) {
+            // Если условие выполнено хотя бы одной провинцией, отмечаем его
+            criteriaSatisfied[checkField.buildingKey] = true;
+          } else {
+            // Если условие не выполнено, продолжаем проверку
+            // Можно добавить дополнительную логику, если требуется
+          }
           
           if (!result) {
             allConditionsMet = false;
@@ -221,31 +238,79 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
     
     if (matchingProvincesState.length > 0 || matchingProvincesOthers.length > 0) {
       // Если есть подходящие провинции, генерируем сообщение о возможностях
-      let message = `[Постройки критерии]\nПостройка ${constructionName}, принадлежащая ${constructionOwner}, может быть построена:`;
+      newMessages.push(`[Постройки][Основные критерии] \nПостройка ${constructionName}, по основным критериям подходит для провинций:`);
       
       if (matchingProvincesState.length > 0) {
         const provincesStateList = matchingProvincesState.join(', ');
-        message += `\n- В провинциях нашего государства: ${provincesStateList}.`;
+        newMessages.push(`[Постройки][Основные критерии] \n- Нашего государства: ${provincesStateList}.`);
       }
       
       if (matchingProvincesOthers.length > 0) {
         const provincesOthersList = matchingProvincesOthers.join(', ');
-        message += `\n- В провинциях других государств: ${provincesOthersList}.`;
+        newMessages.push(`[Постройки][Основные критерии] \n- Других государств: ${provincesOthersList}.`);
       }
-      
-      newMessages.push(message);
     }
     
     if (matchingProvincesState.length === 0 && matchingProvincesOthers.length === 0) {
-      // Если ни одна провинция не подходит, генерируем соответствующее сообщение
+      // Если ни одна провинция не подходит, генерируем соответствующее сообщение с точными причинами
       let reasons = [];
-      CHECK_FIELDS.forEach(checkField => {
-        reasons.push(checkField.buildingKey.replace('required_', '').replace('_', ' '));
-      });
-      const reasonsText = reasons.join(' или ');
       
-      const message = `[Постройки критерии]\nПостройка ${constructionName}, принадлежащая ${constructionOwner}, не подходит ни для одной провинции нашего государства или других государств, из-за неподходящего ${reasonsText}.`;
-      newMessages.push(message);
+      CHECK_FIELDS.forEach(checkField => {
+        const buildingCondition = template[checkField.buildingKey];
+        if (buildingCondition !== undefined && buildingCondition !== null) {
+          if (!criteriaSatisfied[checkField.buildingKey]) {
+            // Добавляем название критерия в читаемом виде
+            let reason = '';
+            switch (checkField.buildingKey) {
+              case 'required_landscapes':
+                reason = 'Ландшафта';
+                break;
+              case 'required_planet':
+                reason = 'Планеты';
+                break;
+              case 'required_culture':
+                reason = 'Культуры';
+                break;
+              case 'required_religion':
+                reason = 'Религии';
+                break;
+              case 'required_climate':
+                reason = 'Климата';
+                break;
+              case 'required_radiation':
+                reason = 'Радиации';
+                break;
+              case 'required_pollution':
+                reason = 'Загрязнения';
+                break;
+              case 'required_stability':
+                reason = 'Провинциальной стабильности';
+                break;
+              // Добавьте дополнительные случаи по мере необходимости
+              default:
+                reason = checkField.buildingKey.replace('required_', '').replace('_', ' ');
+            }
+            reasons.push(reason);
+          }
+        }
+      });
+      
+      if (reasons.length === 0) {
+        // Если не удалось определить причины, используем общий текст
+        reasons.push('неизвестных причин');
+      }
+      
+      // Формируем текст с разделением на запятые и "или"
+      let reasonsText = '';
+      if (reasons.length === 1) {
+        reasonsText = reasons[0];
+      } else if (reasons.length === 2) {
+        reasonsText = `${reasons[0]} или ${reasons[1]}`;
+      } else {
+        reasonsText = reasons.slice(0, -1).join(', ') + ', или ' + reasons[reasons.length - 1];
+      }
+      
+      newMessages.push(`[Постройки][Основные критерии] \nПостройка ${constructionName}, не подходит по основным критериям ни для одной провинции нашего государства или других государств, из-за неподходящего ${reasonsText}.`);
     }
     
     // Сериализуем обновленный шаблон обратно в JSON
