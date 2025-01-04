@@ -53,14 +53,14 @@ function processTurn(data, sheet, spreadsheet) {
   let allNewMessages = [];
   
   try {
+    // Обработка основных критериев построек
     allNewMessages = allNewMessages.concat(processBuildingsCriterias(data, sheet, spreadsheet));
+    // Обработка критериев наличия необходимых построек в провинции
     allNewMessages = allNewMessages.concat(updateProvinceRequiredBuildings(data, spreadsheet));
+    // Обработка критериев наличия необходимых построек в государстве
     allNewMessages = allNewMessages.concat(updateStateRequiredBuildings(data, spreadsheet));
-    allNewMessages = allNewMessages.concat(processWorldLimits(data, sheet, spreadsheet));
-    allNewMessages = allNewMessages.concat(processStateLimits(data, sheet, spreadsheet));
-    allNewMessages = allNewMessages.concat(processProvinceLimits(data, sheet, spreadsheet));
-    allNewMessages = allNewMessages.concat(aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadsheet));
-    allNewMessages = allNewMessages.concat(processArableLandRequirements(data, sheet, spreadsheet));
+    // Обработка критериев наличия необходимого количества агрокультурных земель для строительства
+    allNewMessages = allNewMessages.concat(processArableLandRequirements(data, spreadsheet));
     
     // Фильтрация сообщений
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');

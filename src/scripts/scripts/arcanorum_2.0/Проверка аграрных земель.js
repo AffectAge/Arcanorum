@@ -13,12 +13,12 @@ function processArableLandRequirements(data, sheet, spreadsheet) {
     const provincesData = data['Провинции_ОсновнаяИнформация'];
 
     if (!templatesData || templatesData.length === 0) {
-      messages.push('[Ошибка] Именной диапазон "Постройки_Шаблоны" пуст или не содержит данных.');
+      messages.push('[Ошибка][processArableLandRequirements] Именной диапазон "Постройки_Шаблоны" пуст или не содержит данных.');
       return messages;
     }
 
     if (!provincesData || provincesData.length === 0) {
-      messages.push('[Ошибка] Именной диапазон "Провинции_ОсновнаяИнформация" пуст или не содержит данных.');
+      messages.push('[Ошибка][processArableLandRequirements] Именной диапазон "Провинции_ОсновнаяИнформация" пуст или не содержит данных.');
       return messages;
     }
 
@@ -32,11 +32,11 @@ function processArableLandRequirements(data, sheet, spreadsheet) {
             if (province.id && typeof province.free_arable_land === 'number') {
               return province;
             } else {
-              messages.push(`[Предупреждение] Провинция в строке ${index + 1} не содержит ключи "id" или "free_arable_land" с корректными типами.`);
+              messages.push(`[Ошибка][processArableLandRequirements] Провинция в строке ${index + 1} не содержит ключи "id" или "free_arable_land" с корректными типами.`);
               return null;
             }
           } catch (e) {
-            messages.push(`[Ошибка] Парсинг JSON провинции в строке ${index + 1}: ${e.message}`);
+            messages.push(`[Ошибка][processArableLandRequirements] Парсинг JSON провинции в строке ${index + 1}: ${e.message}`);
             return null;
           }
         }
@@ -66,7 +66,7 @@ function processArableLandRequirements(data, sheet, spreadsheet) {
           let requiredArableLand = template.required_arable_land;
 
           if (typeof requiredArableLand !== 'number' || requiredArableLand < 0) {
-            messages.push(`[Предупреждение] В шаблоне "${template.name}" значение "required_arable_land" некорректно: ${requiredArableLand}. Установлено значение 0.`);
+            messages.push(`[Ошибка][processArableLandRequirements] В шаблоне "${template.name}" значение "required_arable_land" некорректно: ${requiredArableLand}. Установлено значение 0.`);
             template.required_arable_land = 0;
             requiredArableLand = 0;
           }
@@ -83,32 +83,32 @@ function processArableLandRequirements(data, sheet, spreadsheet) {
               const removed = provinceList.filter(id => !eligibleProvinces.includes(id));
 
               if (removed.length > 0) {
-                messages.push(`[Постройки] В шаблоне "${template.name}" из "${type}" удалены провинции из-за недостатка пахотных земель: ${removed.join(', ')}.`);
+                messages.push(`[Постройки][Доступность аграрных земель] Для постройки "${template.name}" ${type}: ${removed.join(', ')} стали неподходящими для строительства из-за недостатка пахотных земель.`);
               }
 
               return filtered;
             }
-            messages.push(`[Предупреждение] В шаблоне "${template.name}" ключ "${type}" не является массивом.`);
+            messages.push(`[Ошибка][processArableLandRequirements] В шаблоне "${template.name}" ключ "${type}" не является массивом.`);
             return [];
           };
 
-          // Обновление списков matching_provinces_state и matching_provinces_others
-          if (template.hasOwnProperty('matching_provinces_state')) {
-            template.matching_provinces_state = filterProvinces(template.matching_provinces_state, 'matching_provinces_state');
+          // Обновление списков allowed_building_state и allowed_building_others
+          if (template.hasOwnProperty('allowed_building_state')) {
+            template.allowed_building_state = filterProvinces(template.allowed_building_state, 'наши провинции');
           } else {
-            messages.push(`[Предупреждение] В шаблоне "${template.name}" отсутствует ключ "matching_provinces_state".`);
+            messages.push(`[Ошибка][processArableLandRequirements] В шаблоне "${template.name}" отсутствует ключ "allowed_building_state".`);
           }
 
-          if (template.hasOwnProperty('matching_provinces_others')) {
-            template.matching_provinces_others = filterProvinces(template.matching_provinces_others, 'matching_provinces_others');
+          if (template.hasOwnProperty('allowed_building_others')) {
+            template.allowed_building_others = filterProvinces(template.allowed_building_others, 'провинции других государств');
           } else {
-            messages.push(`[Предупреждение] В шаблоне "${template.name}" отсутствует ключ "matching_provinces_others".`);
+            messages.push(`[Ошибка][processArableLandRequirements] В шаблоне "${template.name}" отсутствует ключ "allowed_building_others".`);
           }
 
           // Возврат обновленного шаблона
           return [JSON.stringify(template)];
         } catch (e) {
-          messages.push(`[Ошибка] Парсинг JSON шаблона в строке ${rowIndex + 1}: ${e.message}`);
+          messages.push(`[Ошибка][processArableLandRequirements] Парсинг JSON шаблона в строке ${rowIndex + 1}: ${e.message}`);
           return row; // Возврат исходной строки без изменений
         }
       }
@@ -121,7 +121,7 @@ function processArableLandRequirements(data, sheet, spreadsheet) {
     return messages;
     
   } catch (error) {
-    messages.push(`[Критическая ошибка] processArableLandRequirements: ${error.message}`);
+    messages.push(`[Ошибка][processArableLandRequirements] processArableLandRequirements: ${error.message}`);
     return messages;
   }
 }

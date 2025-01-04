@@ -28,20 +28,25 @@
 "province_required_buildings": {
 "AND": [
 {
-"OR": [
-"farm",
-"mine"
-]
-},
-{
 "MIN_COUNT": {
 "farm": 2
+},
+"MAX_COUNT": {
+"mine": 2
 }
 }
 ]
 },
 "state_required_buildings": {
-"MIN_COUNT": { "farm": 1 },
-"MAX_COUNT": { "mine": 3 }
+"AND": [
+{
+"MIN_COUNT": {
+"farm": 2
+},
+"MAX_COUNT": {
+"mine": 2
+}
+}
+]
 }
 }

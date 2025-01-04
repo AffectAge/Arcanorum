@@ -11,7 +11,7 @@ function updateStateRequiredBuildings(data, spreadsheet) {
     // 1. Получение state_name из Переменные_Основные
     const variablesData = data['Переменные_Основные'];
     if (!variablesData || variablesData.length === 0 || !variablesData[0][0]) {
-      newMessages.push(`[Ошибка] Переменные_Основные пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][updateStateRequiredBuildings] Переменные_Основные пуст или не содержит данных.`);
       return newMessages;
     }
 
@@ -20,31 +20,31 @@ function updateStateRequiredBuildings(data, spreadsheet) {
       const rawData = variablesData[0][0];
       // Убедимся, что rawData является строкой и содержит JSON
       if (typeof rawData !== 'string') {
-        newMessages.push(`[Ошибка] Содержимое первой ячейки Переменные_Основные не является строкой.`);
+        newMessages.push(`[Ошибка][updateStateRequiredBuildings] Содержимое первой ячейки Переменные_Основные не является строкой.`);
         return newMessages;
       }
 
       const jsonString = rawData.trim();
       if (!jsonString.startsWith('{') || !jsonString.endsWith('}')) {
-        newMessages.push(`[Ошибка] Содержимое первой ячейки Переменные_Основные не является JSON-строкой.`);
+        newMessages.push(`[Ошибка][updateStateRequiredBuildings] Содержимое первой ячейки Переменные_Основные не является JSON-строкой.`);
         return newMessages;
       }
 
       const variablesJson = JSON.parse(jsonString);
       stateName = variablesJson.state_name;
       if (!stateName) {
-        newMessages.push(`[Ошибка] Ключ "state_name" не найден в Переменные_Основные.`);
+        newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ключ "state_name" не найден в Переменные_Основные.`);
         return newMessages;
       }
     } catch (e) {
-      newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
+      newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
       return newMessages;
     }
 
     // 2. Получение списка провинций
     const provincesData = data['Провинции_ОсновнаяИнформация'];
     if (!provincesData || provincesData.length === 0) {
-      newMessages.push(`[Ошибка] Провинции_ОсновнаяИнформация пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][updateStateRequiredBuildings] Провинции_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
 
@@ -64,10 +64,10 @@ function updateStateRequiredBuildings(data, spreadsheet) {
               stateProvinces.push(province.id);
             }
           } else {
-            newMessages.push(`[Предупреждение] Провинция в строке ${index + 1} не содержит ключа "id" или "owner".`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Провинция в строке ${index + 1} не содержит ключа "id" или "owner".`);
           }
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -75,7 +75,7 @@ function updateStateRequiredBuildings(data, spreadsheet) {
     // 3. Получение списка построек
     const buildingsData = data['Постройки_ОсновнаяИнформация'];
     if (!buildingsData || buildingsData.length === 0) {
-      newMessages.push(`[Ошибка] Постройки_ОсновнаяИнформация пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][updateStateRequiredBuildings] Постройки_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
 
@@ -96,10 +96,10 @@ function updateStateRequiredBuildings(data, spreadsheet) {
             }
             buildingCounts[buildingName] += 1;
           } else {
-            newMessages.push(`[Предупреждение] Постройка не содержит ключи "building_name" или "province_id", или принадлежит другой империи.`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Постройка не содержит ключи "building_name" или "province_id", или принадлежит другой империи.`);
           }
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -107,7 +107,7 @@ function updateStateRequiredBuildings(data, spreadsheet) {
     // 4. Получение списка шаблонов построек
     const templatesData = data['Постройки_Шаблоны'];
     if (!templatesData || templatesData.length === 0) {
-      newMessages.push(`[Ошибка] Постройки_Шаблоны пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][updateStateRequiredBuildings] Постройки_Шаблоны пуст или не содержит данных.`);
       return newMessages;
     }
 
@@ -119,30 +119,30 @@ function updateStateRequiredBuildings(data, spreadsheet) {
         try {
           const template = JSON.parse(cell);
           if (!template.name) {
-            newMessages.push(`[Предупреждение] Шаблон в строке ${index + 1} не содержит ключа "name".`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Шаблон в строке ${index + 1} не содержит ключа "name".`);
             return;
           }
           if (!template.state_required_buildings) {
-            newMessages.push(`[Предупреждение] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "state_required_buildings".`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "state_required_buildings".`);
             return;
           }
           if (!template.matching_provinces_state) {
-            newMessages.push(`[Предупреждение] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "matching_provinces_state".`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "matching_provinces_state".`);
             return;
           }
           if (!template.matching_provinces_others) {
-            newMessages.push(`[Предупреждение] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "matching_provinces_others".`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "matching_provinces_others".`);
             return;
           }
           templates.push({ data: template, row: index });
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${index + 1}: ${e.message}`);
         }
       }
     });
 
     if (templates.length === 0) {
-      newMessages.push(`[Ошибка] Нет корректных шаблонов в Постройки_Шаблоны для обработки.`);
+      newMessages.push(`[Ошибка][updateStateRequiredBuildings] Нет корректных шаблонов в Постройки_Шаблоны для обработки.`);
       return newMessages;
     }
 
@@ -153,7 +153,7 @@ function updateStateRequiredBuildings(data, spreadsheet) {
       const stateCriteria = template.state_required_buildings;
 
       if (typeof stateCriteria !== 'object' || stateCriteria === null) {
-        newMessages.push(`[Предупреждение] Шаблон "${templateName}" имеет некорректные критерии в "state_required_buildings".`);
+        newMessages.push(`[Ошибка][updateStateRequiredBuildings] Шаблон "${templateName}" имеет некорректные критерии в "state_required_buildings".`);
         return;
       }
 
@@ -161,23 +161,23 @@ function updateStateRequiredBuildings(data, spreadsheet) {
 
       if (isMatching) {
         // Критерии выполнены
-        newMessages.push(`Шаблон "${templateName}" соответствует критериям "state_required_buildings".`);
+        newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}" соответствует критериям наличия других построек в государстве.`);
         // Дополнительные действия при необходимости
       } else {
         // Критерии не выполнены
-        newMessages.push(`Шаблон "${templateName}" не соответствует критериям "state_required_buildings".`);
+        newMessages.push(`[Постройки][Необходимые постройки в государстве]Шаблон "${templateName}" не соответствует критериям наличия других построек в государстве.`);
 
         // Очистка списков matching_provinces_state и matching_provinces_others
         if (template.matching_provinces_state && template.matching_provinces_state.length > 0) {
           const removedProvinces = template.matching_provinces_state.join(', ');
           template.matching_provinces_state = [];
-          newMessages.push(`В шаблоне "${templateName}" были удалены провинции из "matching_provinces_state": ${removedProvinces}.`);
+          newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}"больше не соотсвествует критериям наличия построек государства в провинциях нашей страны: ${removedProvinces}.`);
         }
 
         if (template.matching_provinces_others && template.matching_provinces_others.length > 0) {
           const removedProvinces = template.matching_provinces_others.join(', ');
           template.matching_provinces_others = [];
-          newMessages.push(`В шаблоне "${templateName}" были удалены провинции из "matching_provinces_others": ${removedProvinces}.`);
+          newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}"больше не соотсвествует критериям наличия построек государства в провинциях других стран: ${removedProvinces}.`);
         }
 
         // Обновление шаблона в data
@@ -186,7 +186,7 @@ function updateStateRequiredBuildings(data, spreadsheet) {
     });
 
   } catch (error) {
-    newMessages.push(`[Ошибка] updateStateRequiredBuildings: ${error.message}`);
+    newMessages.push(`[Ошибка][updateStateRequiredBuildings] updateStateRequiredBuildings: ${error.message}`);
   }
 
   return newMessages;
