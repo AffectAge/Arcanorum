@@ -53,6 +53,7 @@ function processTurn(data, sheet, spreadsheet) {
   let allNewMessages = [];
   
   try {
+    // Функции на ограничение работы зданий(Шаблоны зданий)
     // Обработка основных критериев построек
     allNewMessages = allNewMessages.concat(processBuildingsCriterias(data, sheet, spreadsheet));
     // Обработка критериев наличия необходимых построек в провинции
@@ -61,6 +62,14 @@ function processTurn(data, sheet, spreadsheet) {
     allNewMessages = allNewMessages.concat(updateStateRequiredBuildings(data, spreadsheet));
     // Обработка критериев наличия необходимого количества агрокультурных земель для строительства
     allNewMessages = allNewMessages.concat(processArableLandRequirements(data, spreadsheet));
+
+    // ВАЖНО! Копирование списка провинций подходящих для работы в список провинций подходящих для строительства(Шаблоны зданий)
+    // ВАЖНО! Затем идут функции для обработки ограничений на строительство, они должны идти всегда после функций на ограничение работы зданий
+    allNewMessages = allNewMessages.concat(copyMatchingProvincesToAllowed(data, spreadsheet));
+    // Обработка лимита построек на провинцию
+    allNewMessages = allNewMessages.concat(processProvinceLimits(data, spreadsheet));
+    // Обработка лимита построек на государство
+    allNewMessages = allNewMessages.concat(processStateLimits(data, spreadsheet));
     
     // Фильтрация сообщений
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
