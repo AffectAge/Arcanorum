@@ -53,55 +53,31 @@ function processTurn(data, sheet, spreadsheet) {
   let allNewMessages = [];
   
   try {
-    // Вызов функции для парсинга и обработки JSON данных
-    const newMessages1 = processBuildingsCriterias(data, sheet, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages1);
-
-    // Вызов функции для обновления списков matching_provinces_state и matching_provinces_others
-    const newMessages2 = updateProvinceRequiredBuildings(data, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages2);
-
-    // Вызов функции для обновления списков matching_provinces_state и matching_provinces_others
-    const newMessages21 = updateStateRequiredBuildings(data, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages21);
-
-    // Вызов функции для обработки ограничений провинций
-    const newMessages3 = processWorldLimits(data, sheet, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages3);
-
-    // Вызов функции для обработки ограничений построек по государственному лимиту
-    const newMessages4 = processStateLimits(data, sheet, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages4);
-
-    // Вызов функции для обработки ограничений провинций
-    const newMessages5 = processProvinceLimits(data, sheet, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages5);
-
-    // Вызов функции для обработки ограничений провинций
-    const newMessages6 = aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadsheet);
-    allNewMessages = allNewMessages.concat(newMessages6);
+    allNewMessages = allNewMessages.concat(processBuildingsCriterias(data, sheet, spreadsheet));
+    allNewMessages = allNewMessages.concat(updateProvinceRequiredBuildings(data, spreadsheet));
+    allNewMessages = allNewMessages.concat(updateStateRequiredBuildings(data, spreadsheet));
+    allNewMessages = allNewMessages.concat(processWorldLimits(data, sheet, spreadsheet));
+    allNewMessages = allNewMessages.concat(processStateLimits(data, sheet, spreadsheet));
+    allNewMessages = allNewMessages.concat(processProvinceLimits(data, sheet, spreadsheet));
+    allNewMessages = allNewMessages.concat(aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadsheet));
+    allNewMessages = allNewMessages.concat(processArableLandRequirements(data, sheet, spreadsheet));
     
-    // Проверка типов сообщений перед добавлением
+    // Фильтрация сообщений
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
     
-    // Добавление всех новых сообщений в Журнал_Событий
+    // Добавление сообщений в Журнал_Событий
     if (allNewMessages.length > 0) {
       addMessagesToRange4(allNewMessages, spreadsheet);
     }
     
-    // После обработки данных передаём их в функцию для записи (исключая Журнал_Событий)
+    // Обновление диапазонов
     updateRanges(data, spreadsheet);
     
   } catch (error) {
-    // Добавление сообщения об ошибке в Журнал_Событий
     const errorMessage = `[Ошибка] processTurn: ${error.message}`;
     addMessagesToRange4([errorMessage], spreadsheet);
   }
 }
-
-
-
-
 
 /**
  * Функция для записи обновленных данных обратно в именованные диапазоны
