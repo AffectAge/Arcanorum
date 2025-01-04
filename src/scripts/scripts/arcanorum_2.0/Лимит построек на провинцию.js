@@ -12,7 +12,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
     // Получение state_name из Переменные_Основные
     const variablesData = data['Переменные_Основные'];
     if (!variablesData || variablesData.length === 0 || !variablesData[0][0]) {
-      newMessages.push(`[Ошибка] Переменные_Основные пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processProvinceLimits] Переменные_Основные пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -24,21 +24,21 @@ function processProvinceLimits(data, sheet, spreadsheet) {
         const variablesJson = JSON.parse(jsonMatch[0]);
         stateName = variablesJson.state_name;
         if (!stateName) {
-          newMessages.push(`[Ошибка] Ключ "state_name" не найден в Переменные_Основные.`);
+          newMessages.push(`[Ошибка][processProvinceLimits] Ключ "state_name" не найден в Переменные_Основные.`);
           return newMessages;
         }
       } else {
         throw new Error('Не удалось извлечь JSON из содержимого Переменные_Основные.');
       }
     } catch (e) {
-      newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
+      newMessages.push(`[Ошибка][processProvinceLimits] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
       return newMessages;
     }
     
     // Получение списка провинций
     const provincesData = data['Провинции_ОсновнаяИнформация'];
     if (!provincesData || provincesData.length === 0) {
-      newMessages.push(`[Ошибка] Провинции_ОсновнаяИнформация пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processProvinceLimits] Провинции_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -62,10 +62,10 @@ function processProvinceLimits(data, sheet, spreadsheet) {
           if (province.id) {
             provinceMap[province.id] = province;
           } else {
-            newMessages.push(`[Предупреждение] Провинция в строке ${index + 1} не содержит ключа "id".`);
+            newMessages.push(`[Ошибка][processProvinceLimits] Провинция в строке ${index + 1} не содержит ключа "id".`);
           }
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][processProvinceLimits] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -73,7 +73,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
     // Получение списка построек
     const buildingsData = data['Постройки_ОсновнаяИнформация'];
     if (!buildingsData || buildingsData.length === 0) {
-      newMessages.push(`[Ошибка] Постройки_ОсновнаяИнформация пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processProvinceLimits] Постройки_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -89,7 +89,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
           const provinceId = building.province_id;
           
           if (!buildingName || !provinceId) {
-            newMessages.push(`[Предупреждение] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
+            newMessages.push(`[Ошибка][processProvinceLimits] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
             return;
           }
           
@@ -103,7 +103,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
           
           buildingCounts[provinceId][buildingName] += 1;
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][processProvinceLimits] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -111,7 +111,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
     // Получение списка шаблонов построек
     const templatesData = data['Постройки_Шаблоны'];
     if (!templatesData || templatesData.length === 0) {
-      newMessages.push(`[Ошибка] Постройки_Шаблоны пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processProvinceLimits] Постройки_Шаблоны пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -123,24 +123,30 @@ function processProvinceLimits(data, sheet, spreadsheet) {
         try {
           const template = JSON.parse(cell);
           if (!template.name) {
-            newMessages.push(`[Предупреждение] Шаблон в строке ${index + 1} не содержит ключа "name".`);
+            newMessages.push(`[Ошибка][processProvinceLimits] Шаблон в строке ${index + 1} не содержит ключа "name".`);
             return;
           }
           if (template.province_limit === undefined || template.province_limit === null) {
-            newMessages.push(`[Предупреждение] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "province_limit".`);
+            newMessages.push(`[Ошибка][processProvinceLimits] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "province_limit".`);
             return;
           }
           templates.push({ data: template, row: index });
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][processProvinceLimits] Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${index + 1}: ${e.message}`);
         }
       }
     });
     
     if (templates.length === 0) {
-      newMessages.push(`[Ошибка] Нет корректных шаблонов в Постройки_Шаблоны для обработки.`);
+      newMessages.push(`[Ошибка][processProvinceLimits] Нет корректных шаблонов в Постройки_Шаблоны для обработки.`);
       return newMessages;
     }
+    
+    // Объект сопоставления ключей к понятным фразам
+    const listKeyDescriptions = {
+      'allowed_building_state': 'в наших провинциях',
+      'allowed_building_others': 'в провинциях других государств'
+    };
     
     // Обработка каждого шаблона
     templates.forEach(templateInfo => {
@@ -149,7 +155,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
       const provinceLimit = template.province_limit;
       
       if (typeof provinceLimit !== 'number' || provinceLimit < 0) {
-        newMessages.push(`[Предупреждение] Шаблон "${templateName}" имеет некорректное значение "province_limit": ${provinceLimit}.`);
+        newMessages.push(`[Ошибка][processProvinceLimits] Шаблон "${templateName}" имеет некорректное значение "province_limit": ${provinceLimit}.`);
         return;
       }
       
@@ -163,7 +169,7 @@ function processProvinceLimits(data, sheet, spreadsheet) {
           originalList.forEach(provinceId => {
             // Проверяем, существует ли провинция
             if (!provinceMap[provinceId]) {
-              newMessages.push(`[Предупреждение] Провинция с ID "${provinceId}" из "${listKey}" шаблона "${templateName}" не найдена.`);
+              newMessages.push(`[Ошибка][processProvinceLimits] Провинция с ID "${provinceId}" из "${listKey}" шаблона "${templateName}" не найдена.`);
               return;
             }
             
@@ -184,21 +190,30 @@ function processProvinceLimits(data, sheet, spreadsheet) {
             // Обновляем список в шаблоне
             template[listKey] = updatedList;
             
-            // Генерируем сообщение
+            // Получаем понятное описание списка
+            const description = listKeyDescriptions[listKey] || listKey;
+            
+            // Получаем имена провинций для сообщения
             const provinceNames = removedProvinces.map(id => provinceMap[id].id || id).join(', ');
-            newMessages.push(`[Постройки] В шаблоне "${templateName}" были удалены провинции из "${listKey}" из-за достижения лимита построек (${provinceLimit}): ${provinceNames}.`);
+            
+            // Генерируем сообщение
+            newMessages.push(`[Критерии строительства][Лимит построек на провинцию] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для одной провинции. Лимит: ${provinceLimit} на провинцию.`);
           }
         } else {
-          newMessages.push(`[Предупреждение] Шаблон "${templateName}" не содержит массива "${listKey}".`);
+          newMessages.push(`[Ошибка][processProvinceLimits] Шаблон "${templateName}" не содержит массива "${listKey}".`);
         }
       });
       
       // Обновляем шаблон в data
-      data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+      try {
+        data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+      } catch (e) {
+        newMessages.push(`[Ошибка][processProvinceLimits] Ошибка при сериализации JSON для шаблона "${templateName}" в строке ${templateInfo.row + 1}: ${e.message}`);
+      }
     });
     
   } catch (error) {
-    newMessages.push(`[Ошибка] processProvinceLimits: ${error.message}`);
+    newMessages.push(`[Ошибка][processProvinceLimits] processProvinceLimits: ${error.message}`);
   }
   
   return newMessages;
