@@ -70,6 +70,11 @@ function processTurn(data, sheet, spreadsheet) {
     allNewMessages = allNewMessages.concat(processProvinceLimits(data, spreadsheet));
     // Обработка лимита построек на государство
     allNewMessages = allNewMessages.concat(processStateLimits(data, spreadsheet));
+    // Обработка лимита построек на мир
+    allNewMessages = allNewMessages.concat(processWorldLimits(data, spreadsheet));
+    // Обработка критериев наличия ресурсов
+    allNewMessages = allNewMessages.concat(processRequiredResources(data, spreadsheet));
+
     
     // Фильтрация сообщений
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
