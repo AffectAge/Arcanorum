@@ -12,7 +12,7 @@ function processWorldLimits(data, sheet, spreadsheet) {
     // 1. Получение state_name из Переменные_Основные
     const variablesData = data['Переменные_Основные'];
     if (!variablesData || variablesData.length === 0 || !variablesData[0][0]) {
-      newMessages.push(`[Ошибка] Переменные_Основные пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processWorldLimits] Переменные_Основные пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -24,21 +24,21 @@ function processWorldLimits(data, sheet, spreadsheet) {
         const variablesJson = JSON.parse(jsonMatch[0]);
         stateName = variablesJson.state_name;
         if (!stateName) {
-          newMessages.push(`[Ошибка] Ключ "state_name" не найден в Переменные_Основные.`);
+          newMessages.push(`[Ошибка][processWorldLimits] Ключ "state_name" не найден в Переменные_Основные.`);
           return newMessages;
         }
       } else {
         throw new Error('Не удалось извлечь JSON из содержимого Переменные_Основные.');
       }
     } catch (e) {
-      newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
+      newMessages.push(`[Ошибка][processWorldLimits] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
       return newMessages;
     }
     
     // 2. Получение списка провинций
     const provincesData = data['Провинции_ОсновнаяИнформация'];
     if (!provincesData || provincesData.length === 0) {
-      newMessages.push(`[Ошибка] Провинции_ОсновнаяИнформация пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processWorldLimits] Провинции_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -62,10 +62,10 @@ function processWorldLimits(data, sheet, spreadsheet) {
           if (province.id) {
             provinceMap[province.id] = province;
           } else {
-            newMessages.push(`[Предупреждение] Провинция в строке ${index + 1} не содержит ключа "id".`);
+            newMessages.push(`[Ошибка][processWorldLimits] Провинция в строке ${index + 1} не содержит ключа "id".`);
           }
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][processWorldLimits] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -73,7 +73,7 @@ function processWorldLimits(data, sheet, spreadsheet) {
     // 3. Получение списка построек
     const buildingsData = data['Постройки_ОсновнаяИнформация'];
     if (!buildingsData || buildingsData.length === 0) {
-      newMessages.push(`[Ошибка] Постройки_ОсновнаяИнформация пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processWorldLimits] Постройки_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -89,7 +89,7 @@ function processWorldLimits(data, sheet, spreadsheet) {
           const provinceId = building.province_id;
           
           if (!buildingName || !provinceId) {
-            newMessages.push(`[Предупреждение] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
+            newMessages.push(`[Ошибка][processWorldLimits] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
             return;
           }
           
@@ -99,7 +99,7 @@ function processWorldLimits(data, sheet, spreadsheet) {
           
           buildingCounts[buildingName] += 1;
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][processWorldLimits] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -107,7 +107,7 @@ function processWorldLimits(data, sheet, spreadsheet) {
     // 4. Получение списка шаблонов построек
     const templatesData = data['Постройки_Шаблоны'];
     if (!templatesData || templatesData.length === 0) {
-      newMessages.push(`[Ошибка] Постройки_Шаблоны пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processWorldLimits] Постройки_Шаблоны пуст или не содержит данных.`);
       return newMessages;
     }
     
@@ -119,33 +119,39 @@ function processWorldLimits(data, sheet, spreadsheet) {
         try {
           const template = JSON.parse(cell);
           if (!template.name) {
-            newMessages.push(`[Предупреждение] Шаблон в строке ${index + 1} не содержит ключа "name".`);
+            newMessages.push(`[Ошибка][processWorldLimits] Шаблон в строке ${index + 1} не содержит ключа "name".`);
             return;
           }
           if (template.world_limit === undefined || template.world_limit === null) {
-            newMessages.push(`[Предупреждение] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "world_limit".`);
+            newMessages.push(`[Ошибка][processWorldLimits] Шаблон "${template.name}" в строке ${index + 1} не содержит ключа "world_limit".`);
             return;
           }
           templates.push({ data: template, row: index });
         } catch (e) {
-          newMessages.push(`[Ошибка] Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][processWorldLimits] Ошибка при парсинге JSON из Постройки_Шаблоны, строка ${index + 1}: ${e.message}`);
         }
       }
     });
     
     if (templates.length === 0) {
-      newMessages.push(`[Ошибка] Нет корректных шаблонов в Постройки_Шаблоны для обработки.`);
+      newMessages.push(`[Ошибка][processWorldLimits] Нет корректных шаблонов в Постройки_Шаблоны для обработки.`);
       return newMessages;
     }
     
-    // 5. Обработка каждого шаблона
+    // 5. Объект сопоставления ключей к понятным фразам
+    const listKeyDescriptions = {
+      'allowed_building_state': 'в наших провинциях',
+      'allowed_building_others': 'в провинциях других государств'
+    };
+    
+    // 6. Обработка каждого шаблона
     templates.forEach(templateInfo => {
       const template = templateInfo.data;
       const templateName = template.name;
       const worldLimit = template.world_limit;
       
       if (typeof worldLimit !== 'number' || worldLimit < 0) {
-        newMessages.push(`[Предупреждение] Шаблон "${templateName}" имеет некорректное значение "world_limit": ${worldLimit}.`);
+        newMessages.push(`[Ошибка][processWorldLimits] Шаблон "${templateName}" имеет некорректное значение "world_limit": ${worldLimit}.`);
         return;
       }
       
@@ -164,20 +170,25 @@ function processWorldLimits(data, sheet, spreadsheet) {
             // Генерируем сообщение о удалении провинций
             const provinceNames = removedProvinces.map(id => {
               const province = provinceMap[id];
-              return province ? province.id : id;
+              return province ? (province.name || province.id) : id;
             }).join(', ');
             
-            newMessages.push(`[Постройки] В шаблоне "${templateName}" были удалены провинции из "${listKey}" из-за достижения мирового лимита построек (${worldLimit}): ${provinceNames}.`);
+            const description = listKeyDescriptions[listKey] || listKey;
+            newMessages.push(`[Критерии строительства][Лимит построек на мир] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для мира. Лимит: ${worldLimit} на мир.`);
           }
         });
         
         // Обновляем шаблон в data
-        data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+        try {
+          data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+        } catch (e) {
+          newMessages.push(`[Ошибка][processWorldLimits] Ошибка при сериализации JSON для шаблона "${templateName}" в строке ${templateInfo.row + 1}: ${e.message}`);
+        }
       }
     });
-    
+
   } catch (error) {
-    newMessages.push(`[Ошибка] processWorldLimits: ${error.message}`);
+    newMessages.push(`[Ошибка][processWorldLimits] processWorldLimits: ${error.message}`);
   }
   
   return newMessages;

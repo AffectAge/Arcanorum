@@ -221,7 +221,7 @@ function processStateLimits(data, sheet, spreadsheet) {
                   }).join(', ');
                   
                   const description = listKeyDescriptions['allowed_building_others'] || 'allowed_building_others';
-                  newMessages.push(`[Критерии строительства][Лимит построек на государство] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для одной провинции. Лимит: ${stateLimit} на государство.`);
+                  newMessages.push(`[Критерии строительства][Лимит построек на государство] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для одного государства. Лимит: ${stateLimit} на государство.`);
                 }
               }
             }

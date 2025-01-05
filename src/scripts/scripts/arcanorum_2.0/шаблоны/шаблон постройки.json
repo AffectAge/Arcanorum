@@ -5,6 +5,12 @@
 "world_limit":40,
 "state_limit":2,
 "required_arable_land":0,
+"resource_extraction": [
+    {
+      "resource": "wood",
+      "quantity": 80
+    }
+  ],
 "required_landscapes":{
   "AND": [
     "FOREST",

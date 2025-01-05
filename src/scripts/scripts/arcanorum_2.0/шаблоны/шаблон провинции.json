@@ -11,5 +11,19 @@
   "province_climate": [],
   "province_radiation": [],
   "province_pollution": [],
-  "province_stability": []
+  "province_stability": [],
+  "resources": [
+    {
+      "resource": "wood",
+      "quantity": 100
+    },
+    {
+      "resource": "stone",
+      "quantity": 50
+    },
+    {
+      "resource": "iron",
+      "quantity": 30
+    }
+  ]
 }
