@@ -5,6 +5,21 @@
 "world_limit":40,
 "state_limit":2,
 "required_arable_land":0,
+"required_workers":0,
+"required_workers_professions": [
+    {
+      "profession": "Фермер",
+      "quantity": 800
+    },
+	{
+      "profession": "Кузнец",
+      "quantity": 800
+    },
+	{
+      "profession": "Ученый",
+      "quantity": 800
+    }
+  ],
 "resource_extraction": [
     {
       "resource": "wood",
