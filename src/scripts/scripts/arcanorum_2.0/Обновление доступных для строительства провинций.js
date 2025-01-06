@@ -51,7 +51,7 @@ function copyMatchingProvincesToAllowed(data, spreadsheet) {
       // Копирование matching_provinces_state в allowed_building_state
       if ('matching_provinces_state' in template) {
         template.allowed_building_state = template.matching_provinces_state;
-        newMessages.push(`[DEBUG][Копирование данных] Шаблон "${templateName}": matching_provinces_state скопирован в allowed_building_state.`);
+        //newMessages.push(`[DEBUG][Копирование данных] Шаблон "${templateName}": matching_provinces_state скопирован в allowed_building_state.`);
         updated = true;
       } else {
         newMessages.push(`[Ошибка][copyMatchingProvincesToAllowed] Шаблон "${templateName}" не содержит ключа "matching_provinces_state".`);
@@ -60,7 +60,7 @@ function copyMatchingProvincesToAllowed(data, spreadsheet) {
       // Копирование matching_provinces_others в allowed_building_others
       if ('matching_provinces_others' in template) {
         template.allowed_building_others = template.matching_provinces_others;
-        newMessages.push(`[DEBUG][Копирование данных] Шаблон "${templateName}": matching_provinces_others скопирован в allowed_building_others.`);
+        //newMessages.push(`[DEBUG][Копирование данных] Шаблон "${templateName}": matching_provinces_others скопирован в allowed_building_others.`);
         updated = true;
       } else {
         newMessages.push(`[Ошибка][copyMatchingProvincesToAllowed] Шаблон "${templateName}" не содержит ключа "matching_provinces_others".`);
