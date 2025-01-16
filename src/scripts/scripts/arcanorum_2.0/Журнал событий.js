@@ -5,6 +5,17 @@ const MAX_TOTAL_MESSAGES = 1000;        // Общий лимит сообщен�
 const MAX_CHARACTERS_PER_CELL = 50000;  // Лимит символов на ячейку
 
 /**
+ * Карта приоритетов категорий
+ * Меньшее число означает более высокий приоритет
+ */
+const CATEGORY_PRIORITY = {
+  "Ошибка": 1,
+  "Предупреждение": 2,
+  "Постройки": 3,
+  // Добавьте другие категории и их приоритеты здесь
+};
+
+/**
  * Вспомогательная функция для добавления сообщений об ошибках
  * @param {string} message - Сообщение об ошибке
  * @param {Spreadsheet} spreadsheet - Объект активной таблицы
@@ -63,36 +74,41 @@ function mergeCategorizedMessages(existing, newMsgs) {
 }
 
 /**
- * Функция для группировки сообщений по категориям с учетом лимита символов на ячейку
+ * Функция для группировки сообщений по категориям с учетом лимита символов на ячейку и приоритетов категорий
  * @param {Object} categorizedMessages - Объект с категориями и массивами сообщений
  * @returns {Array} - Массив сгруппированных сообщений с префиксом категории и переводами строк
  */
 function groupMessagesByCategory(categorizedMessages) {
   const finalMessages = [];
   
-  for (const category in categorizedMessages) {
-    if (categorizedMessages.hasOwnProperty(category)) {
-      const messages = categorizedMessages[category];
-      const formattedCategory = `[${category}]`;
-      let currentCellText = formattedCategory;
-      
-      messages.forEach(msg => {
-        const additionalText = `\n${msg}`; // Используем перевод строки вместо пробела
-        if ((currentCellText + additionalText).length <= MAX_CHARACTERS_PER_CELL) {
-          currentCellText += additionalText;
-        } else {
-          // Если превышен лимит, сохраняем текущую строку и начинаем новую
-          finalMessages.push(currentCellText);
-          currentCellText = `${formattedCategory}\n${msg}`;
-        }
-      });
-      
-      // Добавляем оставшийся текст
-      if (currentCellText.length > 0) {
+  // Получаем массив категорий и сортируем их по приоритету
+  const sortedCategories = Object.keys(categorizedMessages).sort((a, b) => {
+    const priorityA = CATEGORY_PRIORITY[a] || Number.MAX_SAFE_INTEGER; // Если приоритета нет, ставим низкий приоритет
+    const priorityB = CATEGORY_PRIORITY[b] || Number.MAX_SAFE_INTEGER;
+    return priorityA - priorityB;
+  });
+  
+  sortedCategories.forEach(category => {
+    const messages = categorizedMessages[category];
+    const formattedCategory = `[${category}]`;
+    let currentCellText = formattedCategory;
+    
+    messages.forEach(msg => {
+      const additionalText = `\n${msg}`; // Используем перевод строки вместо пробела
+      if ((currentCellText + additionalText).length <= MAX_CHARACTERS_PER_CELL) {
+        currentCellText += additionalText;
+      } else {
+        // Если превышен лимит, сохраняем текущую строку и начинаем новую
         finalMessages.push(currentCellText);
+        currentCellText = `${formattedCategory}\n${msg}`;
       }
+    });
+    
+    // Добавляем оставшийся текст
+    if (currentCellText.length > 0) {
+      finalMessages.push(currentCellText);
     }
-  }
+  });
   
   return finalMessages;
 }
@@ -154,7 +170,7 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
   // Объединяем существующие и новые сообщения по категориям
   const combinedCategorizedMessages = mergeCategorizedMessages(categorizedExistingMessages, categorizedNewMessages);
   
-  // Группируем сообщения по категориям с учетом лимита символов на ячейку
+  // Группируем сообщения по категориям с учетом лимита символов на ячейку и приоритетов категорий
   const finalMessages = groupMessagesByCategory(combinedCategorizedMessages);
   
   // Учитываем общий лимит на количество сообщений
