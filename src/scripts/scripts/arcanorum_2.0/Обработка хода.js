@@ -60,8 +60,6 @@ function processTurn(data, sheet, spreadsheet) {
     allNewMessages = allNewMessages.concat(updateProvinceRequiredBuildings(data, spreadsheet));
     // Обработка критериев наличия необходимых построек в государстве
     allNewMessages = allNewMessages.concat(updateStateRequiredBuildings(data, spreadsheet));
-    // Обработка критериев наличия необходимого количества агрокультурных земель для строительства
-    allNewMessages = allNewMessages.concat(processArableLandRequirements(data, spreadsheet));
 
     // ВАЖНО! Копирование списка провинций подходящих для работы в список провинций подходящих для строительства(Шаблоны зданий)
     // ВАЖНО! Затем идут функции для обработки ограничений на строительство, они должны идти всегда после функций на ограничение работы зданий
@@ -74,8 +72,14 @@ function processTurn(data, sheet, spreadsheet) {
     allNewMessages = allNewMessages.concat(processWorldLimits(data, spreadsheet));
     // Обработка критериев наличия ресурсов
     allNewMessages = allNewMessages.concat(processRequiredResources(data, spreadsheet));
+    // Обработка критериев наличия необходимого количества агрокультурных земель для строительства
+    allNewMessages = allNewMessages.concat(processArableLandRequirements(data, spreadsheet));
+    // Обработка критериев наличия необходимого количества рабочих для строительства
+    allNewMessages = allNewMessages.concat(processRequiredWorkers(data, spreadsheet));
 
-    
+    // Обработка статистики по населению
+    allNewMessages = allNewMessages.concat(aggregatePopulationDataWithInterestGroupDetails(data, spreadsheet));
+
     // Фильтрация сообщений
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
     
@@ -95,25 +99,54 @@ function processTurn(data, sheet, spreadsheet) {
 
 /**
  * Функция для записи обновленных данных обратно в именованные диапазоны
+ *
  * @param {Object} updatedData - Объект с обновленными данными
  * @param {Spreadsheet} spreadsheet - Объект активной таблицы
  */
 function updateRanges(updatedData, spreadsheet) {
-  for (const rangeName in updatedData) {
-    if (updatedData.hasOwnProperty(rangeName)) {
-      // Исключаем Журнал_Событий из обновления
-      if (rangeName === 'Журнал_Событий') {
-        continue;
+  // Определяем чёрный список диапазонов
+  const blacklist = new Set(['Журнал_Событий']);
+  
+  // Получаем все именованные диапазоны за один вызов API
+  const namedRanges = spreadsheet.getNamedRanges();
+  
+  // Создаём карту для быстрого доступа к диапазонам по имени
+  const namedRangeMap = {};
+  namedRanges.forEach(namedRange => {
+    namedRangeMap[namedRange.getName()] = namedRange.getRange();
+  });
+  
+  // Массив для сбора сообщений об ошибках
+  const errorMessages = [];
+  
+  // Итерация по обновленным данным
+  for (const [rangeName, values] of Object.entries(updatedData)) {
+    // Пропускаем диапазоны из чёрного списка
+    if (blacklist.has(rangeName)) {
+      continue;
+    }
+    
+    const range = namedRangeMap[rangeName];
+    if (range) {
+      try {
+        // Устанавливаем значения в диапазон
+        range.setValues(values);
+      } catch (error) {
+        // Сохраняем сообщение об ошибке для последующей обработки
+        errorMessages.push(`Ошибка при записи в диапазон "${rangeName}": ${error.message}`);
       }
-      
-      const range = spreadsheet.getRangeByName(rangeName);
-      if (range) {
-        range.setValues(updatedData[rangeName]);
-      } else {
-        const errorMsg = `Диапазон с именем "${rangeName}" не найден при записи данных.`;
-        // Добавляем сообщение об ошибке в Журнал_Событий
-        logErrorToEventLog(errorMsg, spreadsheet);
-      }
+    } else {
+      // Диапазон не найден, добавляем сообщение об ошибке
+      errorMessages.push(`Диапазон с именем "${rangeName}" не найден при записи данных.`);
     }
   }
+  
+  // После завершения всех операций, если есть ошибки, логируем их
+  if (errorMessages.length > 0) {
+    const combinedErrorMsg = errorMessages.join('\n');
+    logErrorToEventLog(combinedErrorMsg, spreadsheet);
+  }
+  
+  // Принудительно отправляем все ожидающие изменения
+  SpreadsheetApp.flush();
 }
