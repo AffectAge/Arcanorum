@@ -22,7 +22,7 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
       const stateData = JSON.parse(stateVariables[0][0]);
       if (stateData.state_name && typeof stateData.state_name === 'string') {
         stateName = stateData.state_name;
-        messages.push(`[Отладка] state_name: ${stateName}`);
+        // // messages.push(`[Отладка] state_name: ${stateName}`);
       } else {
         messages.push('[Ошибка] В "Переменные_Основные" отсутствует ключ "state_name" или он не является строкой.');
         return messages;
@@ -64,13 +64,13 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
           messages.push(`[Ошибка] Парсинг JSON провинции в строке ${index + 1}: ${e.message}`);
         }
       } else {
-        messages.push(`[Предупреждение] Провинция в строке ${index + 1} пуста.`);
+        // messages.push(`[Предупреждение] Провинция в строке ${index + 1} пуста.`);
       }
     });
 
     // Логирование содержимого ownProvinces и otherProvinces
-    messages.push(`[Отладка] Собственные провинции: ${ownProvinces.join(', ') || 'Нет'}`);
-    messages.push(`[Отладка] Чужие провинции: ${otherProvinces.join(', ') || 'Нет'}`);
+    // messages.push(`[Отладка] Собственные провинции: ${ownProvinces.join(', ') || 'Нет'}`);
+    // messages.push(`[Отладка] Чужие провинции: ${otherProvinces.join(', ') || 'Нет'}`);
 
     if (ownProvinces.length === 0) {
       messages.push('[Информация] Нет провинций, принадлежащих вашему государству.');
@@ -134,7 +134,7 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
       const religion = pop.religion || '';
 
       // Логирование типа провинции
-      messages.push(`[Отладка] Аггрегация данных для ${provinceType} провинции с ID: ${pop.province_id}`);
+      // messages.push(`[Отладка] Аггрегация данных для ${provinceType} провинции с ID: ${pop.province_id}`);
 
       // Суммирование населения по профессиям
       if (employment.professions && typeof employment.professions === 'object') {
@@ -223,7 +223,7 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
                   aggregateData(pop, aggregatedOther, rowIndex + 1, 'чужой');
                 } else {
                   // Провинция не принадлежит ни собственному государству, ни другим известным
-                  messages.push(`[Предупреждение] Провинция "${pop.province_id}" в строке ${rowIndex + 1} не принадлежит ни вашему государству, ни другим известным.`);
+                  // messages.push(`[Предупреждение] Провинция "${pop.province_id}" в строке ${rowIndex + 1} не принадлежит ни вашему государству, ни другим известным.`);
                 }
               } else {
                 messages.push(`[Предупреждение] В записи населения в строке ${rowIndex + 1} отсутствует или некорректен "province_id".`);
@@ -236,13 +236,13 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
           messages.push(`[Ошибка] Парсинг JSON населения в строке ${rowIndex + 1}: ${e.message}`);
         }
       } else {
-        messages.push(`[Предупреждение] Ячейка с населением в строке ${rowIndex + 1} пуста.`);
+        // messages.push(`[Предупреждение] Ячейка с населением в строке ${rowIndex + 1} пуста.`);
       }
     });
 
     // Логирование агрегированных данных перед записью
-    messages.push(`[Отладка] aggregatedOwn: ${JSON.stringify(aggregatedOwn, null, 2)}`);
-    messages.push(`[Отладка] aggregatedOther: ${JSON.stringify(aggregatedOther, null, 2)}`);
+    // // messages.push(`[Отладка] aggregatedOwn: ${JSON.stringify(aggregatedOwn, null, 2)}`);
+    // // messages.push(`[Отладка] aggregatedOther: ${JSON.stringify(aggregatedOther, null, 2)}`);
 
     // Формирование результирующих JSON с детализированными группами интересов
     const resultJsonOwn = JSON.stringify(aggregatedOwn, null, 2);
@@ -313,7 +313,7 @@ function mergeJson(existingJson, newJson, messages, rowNumber) {
   if (existingJson) {
     try {
       existingObj = JSON.parse(existingJson);
-      messages.push(`[Отладка] Существующий JSON в строке ${rowNumber} успешно распарсен.`);
+      // messages.push(`[Отладка] Существующий JSON в строке ${rowNumber} успешно распарсен.`);
     } catch (e) {
       messages.push(`[Предупреждение] Парсинг существующего JSON в строке ${rowNumber}: ${e.message}. Перезапись данными.`);
       existingObj = {};
@@ -323,7 +323,7 @@ function mergeJson(existingJson, newJson, messages, rowNumber) {
   // Парсинг нового JSON
   try {
     newObj = JSON.parse(newJson);
-    messages.push(`[Отладка] Новый JSON в строке ${rowNumber} успешно распарсен.`);
+    // messages.push(`[Отладка] Новый JSON в строке ${rowNumber} успешно распарсен.`);
   } catch (e) {
     messages.push(`[Ошибка] Парсинг нового JSON в строке ${rowNumber}: ${e.message}`);
     return existingJson; // Возвращаем существующий JSON, если новый некорректен
@@ -338,7 +338,7 @@ function mergeJson(existingJson, newJson, messages, rowNumber) {
       } else {
         // Если ключ существует, обновляем значение
         existingObj[key] = newObj[key];
-        messages.push(`[Отладка] Обновлен ключ "${key}" в строке ${rowNumber}.`);
+        // messages.push(`[Отладка] Обновлен ключ "${key}" в строке ${rowNumber}.`);
       }
     }
   }
