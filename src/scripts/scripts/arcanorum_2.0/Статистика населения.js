@@ -240,16 +240,16 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
       }
     });
 
-    // Логирование агрегированных данных перед записью
-    // // messages.push(`[Отладка] aggregatedOwn: ${JSON.stringify(aggregatedOwn, null, 2)}`);
-    // // messages.push(`[Отладка] aggregatedOther: ${JSON.stringify(aggregatedOther, null, 2)}`);
+    // Агрегация общей статистики населения
+    const aggregatedTotal = mergeAggregatedData(aggregatedOwn, aggregatedOther, messages);
 
     // Формирование результирующих JSON с детализированными группами интересов
     const resultJsonOwn = JSON.stringify(aggregatedOwn, null, 2);
     const resultJsonOther = JSON.stringify(aggregatedOther, null, 2);
+    const resultJsonTotal = JSON.stringify(aggregatedTotal, null, 2); // Новый JSON для общей статистики
 
     // Обновление данных в Переменные_Основные с добавлением ключей, если их нет
-    updateStateVariables(data['Переменные_Основные'], resultJsonOwn, resultJsonOther, messages);
+    updateStateVariables(data['Переменные_Основные'], resultJsonOwn, resultJsonOther, resultJsonTotal, messages);
 
     return messages;
 
@@ -264,13 +264,15 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
  * @param {Array} stateVariables - Массив данных из Переменные_Основные
  * @param {string} resultJsonOwn - JSON строка для собственных провинций
  * @param {string} resultJsonOther - JSON строка для чужих провинций
+ * @param {string} resultJsonTotal - JSON строка для общей статистики
  * @param {Array} messages - Массив сообщений для добавления предупреждений/ошибок
  */
-function updateStateVariables(stateVariables, resultJsonOwn, resultJsonOther, messages) {
+function updateStateVariables(stateVariables, resultJsonOwn, resultJsonOther, resultJsonTotal, messages) {
   // Предполагается, что:
   // - Первая строка содержит исходные данные (stateData)
   // - Вторая строка будет для собственных провинций
   // - Третья строка будет для чужих провинций
+  // - Четвертая строка будет для общей статистики
 
   // Обновляем или добавляем вторую строку
   if (stateVariables.length >= 2) {
@@ -294,6 +296,18 @@ function updateStateVariables(stateVariables, resultJsonOwn, resultJsonOther, me
     }
     stateVariables[2][0] = resultJsonOther;
     messages.push('[Отладка] Добавлена третья строка для чужих провинций.');
+  }
+
+  // Обновляем или добавляем четвертую строку для общей статистики
+  if (stateVariables.length >= 4) {
+    stateVariables[3][0] = mergeJson(stateVariables[3][0], resultJsonTotal, messages, 4);
+  } else {
+    // Добавляем необходимые строки до четвертой
+    while (stateVariables.length < 4) {
+      stateVariables.push(['']);
+    }
+    stateVariables[3][0] = resultJsonTotal;
+    messages.push('[Отладка] Добавлена четвертая строка для общей статистики населения.');
   }
 }
 
@@ -337,11 +351,81 @@ function mergeJson(existingJson, newJson, messages, rowNumber) {
         messages.push(`[Информация] Добавлен новый ключ "${key}" в строку ${rowNumber}.`);
       } else {
         // Если ключ существует, обновляем значение
-        existingObj[key] = newObj[key];
-        // messages.push(`[Отладка] Обновлен ключ "${key}" в строке ${rowNumber}.`);
+        if (typeof existingObj[key] === 'object' && typeof newObj[key] === 'object' && !Array.isArray(existingObj[key])) {
+          // Рекурсивное слияние для вложенных объектов
+          existingObj[key] = mergeObjects(existingObj[key], newObj[key], messages, rowNumber, key);
+        } else {
+          existingObj[key] = newObj[key];
+          // messages.push(`[Отладка] Обновлен ключ "${key}" в строке ${rowNumber}.`);
+        }
       }
     }
   }
 
   return JSON.stringify(existingObj, null, 2);
+}
+
+/**
+ * Вспомогательная функция для слияния двух объектов
+ * @param {Object} obj1 - Первый объект
+ * @param {Object} obj2 - Второй объект
+ * @param {Array} messages - Массив сообщений
+ * @param {number} rowNumber - Номер строки для сообщений
+ * @param {string} parentKey - Ключ родительского объекта
+ * @returns {Object} mergedObj - Объединённый объект
+ */
+function mergeObjects(obj1, obj2, messages, rowNumber, parentKey) {
+  for (const key in obj2) {
+    if (obj2.hasOwnProperty(key)) {
+      if (!obj1.hasOwnProperty(key)) {
+        obj1[key] = obj2[key];
+        messages.push(`[Информация] Добавлен новый ключ "${parentKey}.${key}" в строку ${rowNumber}.`);
+      } else {
+        if (typeof obj1[key] === 'number' && typeof obj2[key] === 'number') {
+          obj1[key] += obj2[key];
+        } else if (typeof obj1[key] === 'object' && typeof obj2[key] === 'object' && !Array.isArray(obj1[key])) {
+          obj1[key] = mergeObjects(obj1[key], obj2[key], messages, rowNumber, `${parentKey}.${key}`);
+        } else {
+          obj1[key] = obj2[key];
+          // messages.push(`[Отладка] Обновлен ключ "${parentKey}.${key}" в строке ${rowNumber}.`);
+        }
+      }
+    }
+  }
+  return obj1;
+}
+
+/**
+ * Вспомогательная функция для объединения двух агрегированных данных
+ * @param {Object} data1 - Первое агрегированное данные
+ * @param {Object} data2 - Второе агрегированное данные
+ * @param {Array} messages - Массив сообщений для добавления предупреждений/ошибок
+ * @returns {Object} mergedData - Объединённые агрегированные данные
+ */
+function mergeAggregatedData(data1, data2, messages) {
+  const mergedData = JSON.parse(JSON.stringify(data1)); // Глубокое копирование data1
+
+  function recursiveMerge(target, source, parentKey = '') {
+    for (const key in source) {
+      if (source.hasOwnProperty(key)) {
+        const currentKey = parentKey ? `${parentKey}.${key}` : key;
+        if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
+          if (!target[key]) {
+            target[key] = {};
+          }
+          recursiveMerge(target[key], source[key], currentKey);
+        } else if (typeof source[key] === 'number') {
+          target[key] = (target[key] || 0) + source[key];
+        } else if (typeof source[key] === 'string') {
+          target[key] = (target[key] || 0) + source[key]; // Для строковых полей, если требуется другая логика, измените здесь
+        } else {
+          target[key] = source[key]; // Для других типов данных
+        }
+      }
+    }
+  }
+
+  recursiveMerge(mergedData, data2);
+
+  return mergedData;
 }
