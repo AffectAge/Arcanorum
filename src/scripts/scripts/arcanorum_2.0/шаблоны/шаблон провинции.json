@@ -1,6 +1,7 @@
 {
   "id": "1",
   "owner": "Украина",
+  "is_capital": true,
   "free_arable_land": 0,
   "occupied_arable_land": 0,
   "total_arable_land": 0,
@@ -25,5 +26,38 @@
       "resource": "iron",
       "quantity": 30
     }
-  ]
+  ],
+  "transport_infrastructure":
+  {
+	"gas":{
+	  "space":[0,0],
+	  "land":[0,0],
+	  "water":[0,0],
+	  "air":[0,0]
+	  },
+	"liquid":{
+		  "space":[0,0],
+		  "land":[0,0],
+		  "water":[0,0],
+		  "air":[0,0]
+		  },
+	"goods":{
+		"space":[0,0],
+		"land":[0,0],
+		"water":[0,0],
+		"air":[0,0]
+		},
+	"service":{
+		"space":[0,0],
+		"land":[0,0],
+		"water":[0,0],
+		"air":[0,0]},
+	"energy":{
+		"space":[0,0],
+		"land":[0,0],
+		"water":[0,0],
+		"air":[0,0]
+	    }
+  }
 }
+
