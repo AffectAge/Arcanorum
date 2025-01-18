@@ -189,19 +189,25 @@ function updateResourcesAvailable(data, spreadsheet) {
         return;
       }
 
-      // Поиск всех маршрутов от столицы до destinationId
-      const routes = findAllRoutes(capitalProvinceId, destinationId, allowedProvincesForRoutes);
-
-      if (routes.length === 0) {
-        messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы (${capitalProvinceId}) до провинции ${destinationId}.`);
-        return;
-      }
-
       // Для каждого типа транспорта
       transportTypes.forEach(transportType => {
-        // Для каждой категории ресурса обрабатываем маршруты
         resourceCategories.forEach(resource => {
-          // Для каждого маршрута вычисляем минимальное значение transportType.resource.capacity
+          let routes = [];
+
+          if (transportType === 'space') {
+            // Для типа 'space' маршрут всегда прямой
+            routes.push([capitalProvinceId, destinationId]);
+          } else {
+            // Для остальных типов транспорта ищем маршруты через allowedProvincesForRoutes
+            routes = findAllRoutes(capitalProvinceId, destinationId, allowedProvincesForRoutes);
+          }
+
+          if (routes.length === 0) {
+            messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы (${capitalProvinceId}) до провинции ${destinationId} для транспорта ${transportType}.`);
+            return;
+          }
+
+          // Определяем оптимальный маршрут
           let optimalRoute = null;
           let maxMinValue = -Infinity;
 
