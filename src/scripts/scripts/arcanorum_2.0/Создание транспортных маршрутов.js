@@ -28,7 +28,7 @@ function updateResourcesAvailable(data, spreadsheet) {
         messages.push(`[Ошибка][updateResourcesAvailable] Переменные_Основные не содержит ключа "accessible_countries" или он не является массивом.`);
         return messages;
       }
-      accessibleCountries = variables.accessible_countries;
+      accessibleCountries = variables.accessible_countries.map(country => country.toLowerCase()); // Приводим к нижнему регистру для согласованности
     } catch (e) {
       messages.push(`[Ошибка][updateResourcesAvailable] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
       return messages;
@@ -52,10 +52,14 @@ function updateResourcesAvailable(data, spreadsheet) {
           const province = JSON.parse(cell);
           if (province.id) {
             provincesMap[province.id] = province;
-            if (province.owner === stateName) {
-              stateProvinces.push(province.id);
-            } else if (accessibleCountries.includes(province.owner)) {
-              allowedOtherProvinces.push(province.id);
+            if (province.owner && typeof province.owner === 'string') {
+              if (province.owner.toLowerCase() === stateName.toLowerCase()) {
+                stateProvinces.push(province.id);
+              } else if (accessibleCountries.includes(province.owner.toLowerCase())) {
+                allowedOtherProvinces.push(province.id);
+              }
+            } else {
+              messages.push(`[Ошибка][updateResourcesAvailable] Провинция в строке ${index + 1} не содержит корректного ключа "owner".`);
             }
           } else {
             messages.push(`[Ошибка][updateResourcesAvailable] Провинция в строке ${index + 1} не содержит ключа "id".`);
@@ -114,8 +118,15 @@ function updateResourcesAvailable(data, spreadsheet) {
     const allowedProvincesForRoutes = [...stateProvinces, ...allowedOtherProvinces];
 
     // Определение типов транспорта и категорий ресурсов
-    const transportTypes = ["land", "air", "water", "space"]; // Добавляем новые типы транспорта
+    const transportTypes = ["land", "air", "water", "space"]; // Упорядочены для логики обработки
     const resourceCategories = ["gas", "liquid", "goods", "service", "energy"];
+
+    // Определение допустимых ландшафтов для каждого типа транспорта
+    const allowedLandscapes = {
+      'water': ['ocean', 'sea'],
+      'land': ['land']
+      // 'air' и 'space' не имеют ограничений по ландшафтам
+    };
 
     // Парсинг transport_infrastructure для всех разрешённых провинций (включая другие страны)
     const transportInfrastructureMap = {}; // provinceId -> transport_infrastructure Object
@@ -194,17 +205,39 @@ function updateResourcesAvailable(data, spreadsheet) {
         resourceCategories.forEach(resource => {
           let routes = [];
 
+          // Определение допустимых провинций для данного типа транспорта
+          let allowedProvincesForTransportType = allowedProvincesForRoutes;
+
+          if (transportType in allowedLandscapes) {
+            // Фильтруем провинции на основе допустимых ландшафтов
+            allowedProvincesForTransportType = allowedProvincesForRoutes.filter(provinceId => {
+              const province = provincesMap[provinceId];
+              if (province && province.landscapes && Array.isArray(province.landscapes)) {
+                // Проверяем наличие хотя бы одного допустимого ландшафта (без учёта регистра)
+                return province.landscapes.some(landscape => 
+                  allowedLandscapes[transportType].includes(landscape.toLowerCase())
+                );
+              }
+              return false;
+            });
+
+            if (allowedProvincesForTransportType.length === 0) {
+              messages.push(`[Информация][updateResourcesAvailable] Нет провинций, подходящих для транспорта "${transportType}" и ресурса "${resource}".`);
+              return; // Переходим к следующей итерации
+            }
+          }
+
           if (transportType === 'space') {
             // Для типа 'space' маршрут всегда прямой
             routes.push([capitalProvinceId, destinationId]);
           } else {
-            // Для остальных типов транспорта ищем маршруты через allowedProvincesForRoutes
-            routes = findAllRoutes(capitalProvinceId, destinationId, allowedProvincesForRoutes);
+            // Для остальных типов транспорта ищем маршруты через allowedProvincesForTransportType
+            routes = findAllRoutes(capitalProvinceId, destinationId, allowedProvincesForTransportType);
           }
 
           if (routes.length === 0) {
-            messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы (${capitalProvinceId}) до провинции ${destinationId} для транспорта ${transportType}.`);
-            return;
+            messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы (${capitalProvinceId}) до провинции ${destinationId} для транспорта "${transportType}".`);
+            return; // Переходим к следующей итерации
           }
 
           // Определяем оптимальный маршрут
@@ -252,7 +285,7 @@ function updateResourcesAvailable(data, spreadsheet) {
               messages.push(`[Ошибка][updateResourcesAvailable] Провинция ${destinationId} не содержит "transport_infrastructure".`);
             }
           } else {
-            messages.push(`[Информация][updateResourcesAvailable] Не найден оптимальный маршрут для провинции ${destinationId}, ресурса ${resource} и транспорта ${transportType}.`);
+            messages.push(`[Информация][updateResourcesAvailable] Не найден оптимальный маршрут для провинции ${destinationId}, ресурса ${resource} и транспорта "${transportType}".`);
           }
         });
       });
