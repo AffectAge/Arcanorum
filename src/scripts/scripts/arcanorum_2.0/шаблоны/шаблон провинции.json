@@ -6,7 +6,7 @@
   "occupied_arable_land": 0,
   "total_arable_land": 0,
   "landscapes": ["FOREST", "MOUNTAIN", "Forest"],
-  "planet": ["Moon", "Mountain", "Forest"],
+  "planet": ["Арканорум"],
   "province_culture": [],
   "province_religion": [],
   "province_climate": [],
