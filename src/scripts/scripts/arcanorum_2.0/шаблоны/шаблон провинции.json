@@ -1,7 +1,7 @@
 {
   "id": "1",
   "owner": "Украина",
-  "is_capital": true,
+  "is_capital": false,
   "free_arable_land": 0,
   "occupied_arable_land": 0,
   "total_arable_land": 0,
@@ -13,6 +13,7 @@
   "province_radiation": [],
   "province_pollution": [],
   "province_stability": [],
+  "neighbors":["1"],
   "resources": [
     {
       "resource": "wood",
@@ -28,36 +29,25 @@
     }
   ],
   "transport_infrastructure":
-  {
-	"gas":{
-	  "space":[0,0],
-	  "land":[0,0],
-	  "water":[0,0],
-	  "air":[0,0]
-	  },
-	"liquid":{
-		  "space":[0,0],
-		  "land":[0,0],
-		  "water":[0,0],
-		  "air":[0,0]
-		  },
-	"goods":{
-		"space":[0,0],
-		"land":[0,0],
-		"water":[0,0],
-		"air":[0,0]
-		},
-	"service":{
-		"space":[0,0],
-		"land":[0,0],
-		"water":[0,0],
-		"air":[0,0]},
-	"energy":{
-		"space":[0,0],
-		"land":[0,0],
-		"water":[0,0],
-		"air":[0,0]
-	    }
-  }
+  {"types":
+  [
+  {"type":"land",
+    "capacity":{"gas":800,"liquid":300,"goods":1000,"service":200,"energy":400},
+	"available":{"gas":450,"liquid":250,"goods":900,"service":180,"energy":350}
+	},
+  {"type":"air",
+    "capacity":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0},
+	"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}
+	},
+  {"type":"water",
+    "capacity":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0},
+	"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}
+	},
+  {"type":"space",
+    "capacity":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0},
+	"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}
+	}
+]
+}
 }
 
