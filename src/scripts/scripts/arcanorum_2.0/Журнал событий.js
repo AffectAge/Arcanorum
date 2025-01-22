@@ -16,6 +16,16 @@ const CATEGORY_PRIORITY = {
 };
 
 /**
+ * Список отключённых категорий
+ * Добавьте названия категорий, которые необходимо отключить
+ */
+const DISABLED_CATEGORIES = [
+  // Например, чтобы отключить категории "Предупреждение" и "Постройки", добавьте их сюда
+  // "Предупреждение",
+  // "Ошибка"
+];
+
+/**
  * Вспомогательная функция для добавления сообщений об ошибках
  * @param {string} message - Сообщение об ошибке
  * @param {Spreadsheet} spreadsheet - Объект активной таблицы
@@ -42,6 +52,11 @@ function categorizeMessages(messages) {
       text = match[2];
     }
     
+    // Пропускаем сообщения из отключённых категорий
+    if (DISABLED_CATEGORIES.includes(category)) {
+      return;
+    }
+    
     if (!categorized[category]) {
       categorized[category] = [];
     }
@@ -63,6 +78,11 @@ function mergeCategorizedMessages(existing, newMsgs) {
   
   for (const category in newMsgs) {
     if (newMsgs.hasOwnProperty(category)) {
+      // Пропускаем отключённые категории
+      if (DISABLED_CATEGORIES.includes(category)) {
+        continue;
+      }
+      
       if (!merged[category]) {
         merged[category] = [];
       }
