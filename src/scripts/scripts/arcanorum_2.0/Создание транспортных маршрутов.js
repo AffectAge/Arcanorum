@@ -53,9 +53,10 @@ function updateResourcesAvailable(data, spreadsheet) {
           if (province.id) {
             provincesMap[province.id] = province;
             if (province.owner && typeof province.owner === 'string') {
-              if (province.owner.toLowerCase() === stateName.toLowerCase()) {
+              const ownerLower = province.owner.toLowerCase();
+              if (ownerLower === stateName.toLowerCase()) {
                 stateProvinces.push(province.id);
-              } else if (accessibleCountries.includes(province.owner.toLowerCase())) {
+              } else if (accessibleCountries.includes(ownerLower)) {
                 allowedOtherProvinces.push(province.id);
               }
             } else {
@@ -70,23 +71,37 @@ function updateResourcesAvailable(data, spreadsheet) {
       }
     });
 
-    // Поиск столицы
-    let capitalProvinceId = null;
+    // Отладочные сообщения для проверки разделения провинций
+    messages.push(`[Отладка][updateResourcesAvailable] stateProvinces: ${JSON.stringify(stateProvinces)}`);
+    messages.push(`[Отладка][updateResourcesAvailable] allowedOtherProvinces: ${JSON.stringify(allowedOtherProvinces)}`);
+
+    // Поиск всех столиц, группируя их по планетам
+    const capitalsByPlanet = {}; // planet -> capitalProvinceId
     stateProvinces.forEach(provinceId => {
       const province = provincesMap[provinceId];
       if (province && province.is_capital === true) {
-        capitalProvinceId = provinceId;
+        if (province.planet && Array.isArray(province.planet)) {
+          province.planet.forEach(planet => {
+            const planetLower = planet.toLowerCase();
+            if (capitalsByPlanet[planetLower]) {
+              messages.push(`[Предупреждение][updateResourcesAvailable] На планете "${planet}" уже существует столица "${capitalsByPlanet[planetLower]}". Дополнительная столица "${provinceId}" не будет учтена.`);
+            } else {
+              capitalsByPlanet[planetLower] = provinceId;
+              messages.push(`[Информация][updateResourcesAvailable] Найдена столица "${provinceId}" на планете "${planet}".`);
+            }
+          });
+        } else {
+          messages.push(`[Ошибка][updateResourcesAvailable] Провинция "${provinceId}" помечена как столица, но не содержит корректного списка планет.`);
+        }
       }
     });
 
-    if (!capitalProvinceId) {
-      messages.push(`[Ошибка][updateResourcesAvailable] Не найдена столица (is_capital=true) среди провинций нашего государства.`);
+    if (Object.keys(capitalsByPlanet).length === 0) {
+      messages.push(`[Ошибка][updateResourcesAvailable] Не найдены столиц среди провинций нашего государства.`);
       return messages;
     }
 
-    messages.push(`[Информация][updateResourcesAvailable] Найдена столица: ${capitalProvinceId}.`);
-
-    // Функция для поиска всех маршрутов от столицы до заданной провинции с дополнительными условиями
+    // Функция для поиска всех маршрутов от заданной столицы до заданной провинции с дополнительными условиями
     function findAllRoutes(startId, endId, allowedProvinces, transportType, planetFilter = null, allowedLandscapesForTransport = null) {
       let routes = [];
       let queue = [[startId]];
@@ -148,9 +163,6 @@ function updateResourcesAvailable(data, spreadsheet) {
       return routes;
     }
 
-    // Определение разрешённых провинций для маршрутов
-    const allowedProvincesForRoutes = [...stateProvinces, ...allowedOtherProvinces];
-
     // Определение типов транспорта и категорий ресурсов
     const transportTypes = ["land", "air", "water", "space"]; // Упорядочены для логики обработки
     const resourceCategories = ["gas", "liquid", "goods", "service", "energy"];
@@ -162,12 +174,12 @@ function updateResourcesAvailable(data, spreadsheet) {
       // 'air' и 'space' не имеют ограничений по ландшафтам
     };
 
-    // Парсинг transport_infrastructure для всех разрешённых провинций (включая другие страны)
+    // Парсинг transport_infrastructure только для собственных провинций
     const transportInfrastructureMap = {}; // provinceId -> transport_infrastructure Object
 
-    const allAllowedProvinces = [...stateProvinces, ...allowedOtherProvinces];
+    const ownProvinces = stateProvinces; // Только собственные провинции
 
-    allAllowedProvinces.forEach(provinceId => {
+    ownProvinces.forEach(provinceId => {
       const province = provincesMap[provinceId];
       if (province && province.transport_infrastructure) {
         // Проверка и добавление отсутствующих транспортных типов
@@ -229,152 +241,170 @@ function updateResourcesAvailable(data, spreadsheet) {
 
     // Обработка каждой провинции нашего государства
     stateProvinces.forEach(destinationId => {
-      if (destinationId === capitalProvinceId) {
-        // Столица сама по себе, пропускаем (можно убрать, если нужно обновлять столицу)
+      const destinationProvince = provincesMap[destinationId];
+      if (!destinationProvince) {
+        messages.push(`[Ошибка][updateResourcesAvailable] Провинция ${destinationId} не найдена в provincesMap.`);
         return;
       }
 
-      // Для каждого типа транспорта
-      transportTypes.forEach(transportType => {
-        resourceCategories.forEach(resource => {
-          let routes = [];
+      // Определение планет, на которых находится провинция
+      const destinationPlanets = destinationProvince.planet.map(p => p.toLowerCase());
 
-          // Определение допустимых провинций для данного типа транспорта
-          let allowedProvincesForTransportType = allowedProvincesForRoutes;
+      // Для каждой планеты провинции, найдите соответствующую столицу
+      destinationPlanets.forEach(planet => {
+        const capitalId = capitalsByPlanet[planet];
+        if (!capitalId) {
+          messages.push(`[Ошибка][updateResourcesAvailable] На планете "${planet}" не найдена столица для маршрутизации провинции ${destinationId}.`);
+          return;
+        }
 
-          // Определение дополнительных ограничений по ландшафтам
-          let allowedLandscapesForTransport = null;
-          if (transportType in allowedLandscapes) {
-            allowedLandscapesForTransport = allowedLandscapes[transportType].map(l => l.toLowerCase());
-            // Фильтруем провинции на основе допустимых ландшафтов
-            allowedProvincesForTransportType = allowedProvincesForRoutes.filter(provinceId => {
-              const province = provincesMap[provinceId];
-              if (province && province.landscapes && Array.isArray(province.landscapes)) {
-                // Проверяем наличие хотя бы одного допустимого ландшафта (без учёта регистра)
-                return province.landscapes.map(l => l.toLowerCase()).some(l => allowedLandscapesForTransport.includes(l));
-              }
-              return false;
-            });
+        // Если провинция сама является столицей на этой планете, пропускаем
+        if (destinationId === capitalId) {
+          return;
+        }
 
-            if (allowedProvincesForTransportType.length === 0) {
-              messages.push(`[Информация][updateResourcesAvailable] Нет провинций, подходящих для транспорта "${transportType}" и ресурса "${resource}".`);
-              return; // Переходим к следующей итерации
-            }
-          }
+        // Для каждого типа транспорта
+        transportTypes.forEach(transportType => {
+          resourceCategories.forEach(resource => {
+            let routes = [];
 
-          // Определение допустимых планет для типов транспорта, требующих одной планеты
-          let planetFilter = null;
-          if (transportType === 'air' || transportType === 'land' || transportType === 'water') {
-            const capitalProvince = provincesMap[capitalProvinceId];
-            const destinationProvince = provincesMap[destinationId];
+            // Определение допустимых провинций для данного типа транспорта
+            let allowedProvincesForTransportType = [...stateProvinces, ...allowedOtherProvinces];
 
-            if (!capitalProvince.planet || !Array.isArray(capitalProvince.planet) ||
-                !destinationProvince.planet || !Array.isArray(destinationProvince.planet)) {
-              messages.push(`[Ошибка][updateResourcesAvailable] Провинции ${capitalProvinceId} или ${destinationId} не содержат корректных данных по ключу "planet".`);
-              return; // Переходим к следующей итерации
-            }
-
-            // Определяем общие планеты между столицей и целевой провинцией
-            const commonPlanets = capitalProvince.planet.map(p => p.toLowerCase()).filter(p => destinationProvince.planet.map(dp => dp.toLowerCase()).includes(p));
-
-            if (commonPlanets.length === 0) {
-              messages.push(`[Информация][updateResourcesAvailable] Нет общих планет между столицей (${capitalProvinceId}) и провинцией ${destinationId} для транспорта "${transportType}".`);
-              return; // Переходим к следующей итерации
-            }
-
-            // Устанавливаем фильтр планет для типов транспорта, требующих маршруты на одной планете
-            planetFilter = commonPlanets;
-          }
-
-          if (transportType === 'space') {
-            // Для типа 'space' маршрут всегда прямой
-            routes.push([capitalProvinceId, destinationId]);
-          } else if (transportType === 'air' || transportType === 'land' || transportType === 'water') {
-            // Для типов 'air', 'land', 'water' маршруты должны полностью находиться на одной планете
-            // и для 'land' и 'water' также учитывать ландшафты
-            const capitalProvince = provincesMap[capitalProvinceId];
-            const destinationProvince = provincesMap[destinationId];
-
-            // Определяем общие планеты между столицей и целевой провинцией
-            const commonPlanets = capitalProvince.planet.map(p => p.toLowerCase()).filter(p => destinationProvince.planet.map(dp => dp.toLowerCase()).includes(p));
-
-            // Для каждой общей планеты ищем маршруты, полностью находящиеся на этой планете
-            let transportRoutes = [];
-            commonPlanets.forEach(planet => {
-              // Фильтруем провинции, чтобы они находились на текущей планете
-              const provincesOnPlanet = allowedProvincesForTransportType.filter(provinceId => {
+            // Определение дополнительных ограничений по ландшафтам
+            let allowedLandscapesForTransport = null;
+            if (transportType in allowedLandscapes) {
+              allowedLandscapesForTransport = allowedLandscapes[transportType].map(l => l.toLowerCase());
+              // Фильтруем провинции на основе допустимых ландшафтов
+              allowedProvincesForTransportType = allowedProvincesForTransportType.filter(provinceId => {
                 const province = provincesMap[provinceId];
-                return province.planet && Array.isArray(province.planet) &&
-                       province.planet.map(p => p.toLowerCase()).includes(planet);
+                if (province && province.landscapes && Array.isArray(province.landscapes)) {
+                  // Проверяем наличие хотя бы одного допустимого ландшафта (без учёта регистра)
+                  return province.landscapes.map(l => l.toLowerCase()).some(l => allowedLandscapesForTransport.includes(l));
+                }
+                return false;
               });
 
-              // Ищем маршруты на текущей планете
-              const planetRoutes = findAllRoutes(
-                capitalProvinceId,
-                destinationId,
-                provincesOnPlanet,
-                transportType,
-                [planet],
-                allowedLandscapesForTransport // Передаём допустимые ландшафты для 'land' и 'water'
-              );
-              transportRoutes = transportRoutes.concat(planetRoutes);
-            });
+              if (allowedProvincesForTransportType.length === 0) {
+                messages.push(`[Информация][updateResourcesAvailable] Нет провинций, подходящих для транспорта "${transportType}" и ресурса "${resource}".`);
+                return; // Переходим к следующей итерации
+              }
+            }
 
-            routes = transportRoutes;
-          }
+            // Определение допустимых планет для типов транспорта, требующих одной планеты
+            let planetFilter = null;
+            if (transportType === 'air' || transportType === 'land' || transportType === 'water') {
+              const capitalProvince = provincesMap[capitalId];
+              const destinationProvince = provincesMap[destinationId];
 
-          if (routes.length === 0) {
-            messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы (${capitalProvinceId}) до провинции ${destinationId} для транспорта "${transportType}".`);
-            return; // Переходим к следующей итерации
-          }
+              if (!capitalProvince.planet || !Array.isArray(capitalProvince.planet) ||
+                  !destinationProvince.planet || !Array.isArray(destinationProvince.planet)) {
+                messages.push(`[Ошибка][updateResourcesAvailable] Провинции ${capitalId} или ${destinationId} не содержат корректных данных по ключу "planet".`);
+                return; // Переходим к следующей итерации
+              }
 
-          // Определяем оптимальный маршрут
-          let optimalRoute = null;
-          let maxMinValue = -Infinity;
+              // Определяем общие планеты между столицей и целевой провинцией
+              const commonPlanets = capitalProvince.planet.map(p => p.toLowerCase()).filter(p => destinationProvince.planet.map(dp => dp.toLowerCase()).includes(p));
 
-          routes.forEach(route => {
-            let minValue = Infinity;
-            route.forEach(provinceId => {
-              const transport = transportInfrastructureMap[provinceId];
-              if (transport && transport.types) {
-                const typeObj = transport.types.find(t => t.type === transportType);
-                if (typeObj && typeof typeObj.capacity[resource] === 'number') {
-                  if (typeObj.capacity[resource] < minValue) {
-                    minValue = typeObj.capacity[resource];
+              if (commonPlanets.length === 0) {
+                messages.push(`[Информация][updateResourcesAvailable] Нет общих планет между столицей (${capitalId}) и провинцией ${destinationId} для транспорта "${transportType}".`);
+                return; // Переходим к следующей итерации
+              }
+
+              // Устанавливаем фильтр планет для типов транспорта, требующих маршруты на одной планете
+              planetFilter = commonPlanets;
+            }
+
+            if (transportType === 'space') {
+              // Для типа 'space' маршрут всегда прямой
+              routes.push([capitalId, destinationId]);
+            } else if (transportType === 'air' || transportType === 'land' || transportType === 'water') {
+              // Для типов 'air', 'land', 'water' маршруты должны полностью находиться на одной планете
+              // и для 'land' и 'water' также учитывать ландшафты
+              const capitalProvince = provincesMap[capitalId];
+              const destinationProvince = provincesMap[destinationId];
+
+              // Определяем общие планеты между столицей и целевой провинцией
+              const commonPlanets = capitalProvince.planet.map(p => p.toLowerCase()).filter(p => destinationProvince.planet.map(dp => dp.toLowerCase()).includes(p));
+
+              // Для каждой общей планеты ищем маршруты, полностью находящиеся на этой планете
+              let transportRoutes = [];
+              commonPlanets.forEach(planet => {
+                // Фильтруем провинции, чтобы они находились на текущей планете
+                const provincesOnPlanet = allowedProvincesForTransportType.filter(provinceId => {
+                  const province = provincesMap[provinceId];
+                  return province.planet && Array.isArray(province.planet) &&
+                         province.planet.map(p => p.toLowerCase()).includes(planet);
+                });
+
+                // Ищем маршруты на текущей планете
+                const planetRoutes = findAllRoutes(
+                  capitalId,
+                  destinationId,
+                  provincesOnPlanet,
+                  transportType,
+                  [planet],
+                  allowedLandscapesForTransport // Передаём допустимые ландшафты для 'land' и 'water'
+                );
+                transportRoutes = transportRoutes.concat(planetRoutes);
+              });
+
+              routes = transportRoutes;
+            }
+
+            if (routes.length === 0) {
+              messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы (${capitalsByPlanet[planet]}) до провинции ${destinationId} для транспорта "${transportType}".`);
+              return; // Переходим к следующей итерации
+            }
+
+            // Определяем оптимальный маршрут
+            let optimalRoute = null;
+            let maxMinValue = -Infinity;
+
+            routes.forEach(route => {
+              let minValue = Infinity;
+              route.forEach(provinceId => {
+                const transport = transportInfrastructureMap[provinceId];
+                if (transport && transport.types) {
+                  const typeObj = transport.types.find(t => t.type === transportType);
+                  if (typeObj && typeof typeObj.capacity[resource] === 'number') {
+                    if (typeObj.capacity[resource] < minValue) {
+                      minValue = typeObj.capacity[resource];
+                    }
+                  } else {
+                    // Если нет данных по transportType.resource, считаем минимальное значение как 0
+                    minValue = 0;
                   }
                 } else {
-                  // Если нет данных по transportType.resource, считаем минимальное значение как 0
+                  // Если нет transport_infrastructure, считаем минимальное значение как 0
                   minValue = 0;
                 }
-              } else {
-                // Если нет transport_infrastructure, считаем минимальное значение как 0
-                minValue = 0;
+              });
+
+              if (minValue > maxMinValue) {
+                maxMinValue = minValue;
+                optimalRoute = route;
               }
             });
 
-            if (minValue > maxMinValue) {
-              maxMinValue = minValue;
-              optimalRoute = route;
-            }
-          });
-
-          if (optimalRoute) {
-            // Установка available.transportType.resource в минимальное значение маршрута для destinationId
-            const destinationTransport = transportInfrastructureMap[destinationId];
-            if (destinationTransport && destinationTransport.types) {
-              const typeObj = destinationTransport.types.find(t => t.type === transportType);
-              if (typeObj && typeObj.available && typeof typeObj.available[resource] === 'number') {
-                typeObj.available[resource] = maxMinValue; // Заменяем вместо Math.min
-                messages.push(`[Обновление][updateResourcesAvailable] Провинция ${destinationId}: available.${transportType}.${resource} установлено в ${typeObj.available[resource]} на основе маршрута ${optimalRoute.join(' -> ')}.`);
+            if (optimalRoute) {
+              // Установка available.transportType.resource в минимальное значение маршрута для destinationId
+              const destinationTransport = transportInfrastructureMap[destinationId];
+              if (destinationTransport && destinationTransport.types) {
+                const typeObj = destinationTransport.types.find(t => t.type === transportType);
+                if (typeObj && typeObj.available && typeof typeObj.available[resource] === 'number') {
+                  typeObj.available[resource] = maxMinValue; // Заменяем вместо Math.min
+                  messages.push(`[Обновление][updateResourcesAvailable] Провинция ${destinationId}: available.${transportType}.${resource} установлено в ${typeObj.available[resource]} на основе маршрута ${optimalRoute.join(' -> ')}.`);
+                } else {
+                  messages.push(`[Ошибка][updateResourcesAvailable] Провинция ${destinationId} не содержит ключей "${transportType}" или "available.${resource}" в transport_infrastructure.`);
+                }
               } else {
-                messages.push(`[Ошибка][updateResourcesAvailable] Провинция ${destinationId} не содержит ключей "${transportType}" или "available.${resource}" в transport_infrastructure.`);
+                messages.push(`[Ошибка][updateResourcesAvailable] Провинция ${destinationId} не содержит "transport_infrastructure".`);
               }
             } else {
-              messages.push(`[Ошибка][updateResourcesAvailable] Провинция ${destinationId} не содержит "transport_infrastructure".`);
+              messages.push(`[Информация][updateResourcesAvailable] Не найден оптимальный маршрут для провинции ${destinationId}, ресурса "${resource}" и транспорта "${transportType}".`);
             }
-          } else {
-            messages.push(`[Информация][updateResourcesAvailable] Не найден оптимальный маршрут для провинции ${destinationId}, ресурса "${resource}" и транспорта "${transportType}".`);
-          }
+          });
         });
       });
     });
@@ -386,7 +416,7 @@ function updateResourcesAvailable(data, spreadsheet) {
         try {
           const province = JSON.parse(cell);
           if (province.id && transportInfrastructureMap[province.id]) {
-            // Обновляем transport_infrastructure
+            // Обновляем transport_infrastructure только для собственных провинций
             province.transport_infrastructure = transportInfrastructureMap[province.id];
             return [JSON.stringify(province)];
           } else {
