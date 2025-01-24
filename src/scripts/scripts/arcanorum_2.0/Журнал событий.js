@@ -26,6 +26,21 @@ const DISABLED_CATEGORIES = [
 ];
 
 /**
+ * Слова и соответствующие им цвета для цветовой маркировки
+ */
+const WORD_COLORS = {
+  "не соответствует": "#FF0000",        // Красный
+  "Кирпичный завод": "#FFA500", // Оранжевый
+  "[Необходимые постройки в государстве]": "#0000FF",      // Синий
+  "Ландшафта": "#008000",
+  "Планеты": "#80FFA500",
+  "Культуры": "#240089",
+  "Постройка": "#808080",
+  "Львов": "#7F92FF",
+  // Добавьте другие слова и цвета по необходимости
+};
+
+/**
  * Вспомогательная функция для добавления сообщений об ошибках
  * @param {string} message - Сообщение об ошибке
  * @param {Spreadsheet} spreadsheet - Объект активной таблицы
@@ -158,6 +173,36 @@ function enforceTotalMessageLimit(finalMessages) {
 }
 
 /**
+ * Применяет цветовую маркировку к указанным словам в сообщении
+ * @param {string} message - Текст сообщения
+ * @returns {RichTextValue} - Объект RichTextValue с применёнными цветами
+ */
+function applyWordColors(message) {
+  // Создаём новый RichTextValueBuilder и устанавливаем текст сообщения
+  let builder = SpreadsheetApp.newRichTextValue().setText(message);
+  
+  // Проходим по всем словам и их соответствующим цветам
+  for (const [word, color] of Object.entries(WORD_COLORS)) {
+    let startIndex = 0;
+    
+    // Ищем все вхождения слова в сообщении
+    while (true) {
+      const foundIndex = message.indexOf(word, startIndex);
+      if (foundIndex === -1) break;
+      
+      // Применяем цвет к найденному слову
+      builder = builder.setTextStyle(foundIndex, foundIndex + word.length, SpreadsheetApp.newTextStyle().setForegroundColor(color).build());
+      
+      // Продолжаем поиск с конца текущего найденного слова
+      startIndex = foundIndex + word.length;
+    }
+  }
+
+  // Строим и возвращаем RichTextValue
+  return builder.build();
+}
+
+/**
  * Вспомогательная функция для добавления сообщений в Журнал_Событий с учетом общего лимита и группировки по категориям
  * @param {Array} messagesToAdd - Массив новых сообщений для добавления
  * @param {Spreadsheet} spreadsheet - Объект активной таблицы
@@ -196,8 +241,8 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
   // Учитываем общий лимит на количество сообщений
   const limitedFinalMessages = enforceTotalMessageLimit(finalMessages);
   
-  // Преобразуем массив сообщений в двумерный массив для записи
-  const messagesForSheet = limitedFinalMessages.map(msg => [msg]);
+  // Преобразуем массив сообщений в двумерный массив для записи с применением цветовой маркировки
+  const messagesForSheet = limitedFinalMessages.map(msg => [applyWordColors(msg)]);
   
   // Записываем обновленные сообщения обратно в Журнал_Событий
   // Проверяем, достаточно ли строк в Журнал_Событий для записи
@@ -207,10 +252,10 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
   if (numRowsToWrite > maxRows) {
     // Если строк недостаточно, расширяем диапазон
     const newRange = sheet.getRange(range.getRow(), range.getColumn(), numRowsToWrite, 1);
-    newRange.setValues(messagesForSheet);
+    newRange.setRichTextValues(messagesForSheet);
   } else {
     // Иначе записываем только необходимые строки
-    range.offset(0, 0, numRowsToWrite, 1).setValues(messagesForSheet);
+    range.offset(0, 0, numRowsToWrite, 1).setRichTextValues(messagesForSheet);
   }
   
   // Включаем перенос текста (Wrap Text) для Журнал_Событий, чтобы отображались переводы строк
