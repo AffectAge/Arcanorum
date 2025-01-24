@@ -1,12 +1,13 @@
 /**
  * Функция для обновления доступности ресурсов на основе оптимальных маршрутов для различных типов транспорта
+ *
  * @param {Object} data - Объект с данными из именованных диапазонов.
  * @param {Spreadsheet} spreadsheet - Активная таблица.
  * @returns {Array} messages - Массив сообщений для журнала событий.
  */
 function updateResourcesAvailable(data, spreadsheet) {
   let messages = [];
-  
+
   try {
     // Извлечение stateName и accessible_countries из Переменные_Основные
     const variablesData = data['Переменные_Основные'];
@@ -31,6 +32,33 @@ function updateResourcesAvailable(data, spreadsheet) {
       accessibleCountries = variables.accessible_countries.map(country => country.toLowerCase()); // Приводим к нижнему регистру для согласованности
     } catch (e) {
       messages.push(`[Ошибка][updateResourcesAvailable] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
+      return messages;
+    }
+
+    // Извлечение coastal_landscapes из Настройки
+    const settingsData = data['Настройки'];
+    if (!settingsData || settingsData.length === 0) {
+      messages.push(`[Ошибка][updateResourcesAvailable] Настройки пуст или не содержит данных.`);
+      return messages;
+    }
+
+    let coastalLandscapes = [];
+    try {
+      // Поиск строки, где первый столбец равен "Настройки торговых путей" (без учета регистра)
+      const settingRow = settingsData.find(row => row[0] && row[0].toLowerCase() === 'настройки торговых путей');
+      if (!settingRow || !settingRow[1]) {
+        messages.push(`[Ошибка][updateResourcesAvailable] Не найдена строка "Настройки торговых путей" в Настройках.`);
+        return messages;
+      }
+      // Парсинг JSON-объекта и извлечение coastal_landscapes
+      const settingsObject = JSON.parse(settingRow[1]);
+      if (!settingsObject.coastal_landscapes || !Array.isArray(settingsObject.coastal_landscapes)) {
+        messages.push(`[Ошибка][updateResourcesAvailable] Настройки торговых путей не содержат ключа "coastal_landscapes" или он не является массивом.`);
+        return messages;
+      }
+      coastalLandscapes = settingsObject.coastal_landscapes.map(landscape => landscape.toLowerCase()); // Приводим к нижнему регистру
+    } catch (e) {
+      messages.push(`[Ошибка][updateResourcesAvailable] Ошибка при парсинге coastal_landscapes из Настроек: ${e.message}`);
       return messages;
     }
 
@@ -101,16 +129,33 @@ function updateResourcesAvailable(data, spreadsheet) {
       return messages;
     }
 
+    // Функции для определения типов провинций
+    function isCoastalProvince(province) {
+      return province.landscapes && Array.isArray(province.landscapes) &&
+             province.landscapes.map(l => l.toLowerCase()).some(l => coastalLandscapes.includes(l));
+    }
+
+    function isMarineProvince(province) {
+      return province.landscapes && Array.isArray(province.landscapes) &&
+             (province.landscapes.map(l => l.toLowerCase()).includes('sea') ||
+              province.landscapes.map(l => l.toLowerCase()).includes('ocean'));
+    }
+
     // Функция для поиска всех маршрутов от заданной столицы до заданной провинции с дополнительными условиями
-    function findAllRoutes(startId, endId, allowedProvinces, transportType, planetFilter = null, allowedLandscapesForTransport = null) {
+    function findAllRoutes(startId, endId, allowedProvinces, transportType, planetFilter = null, allowedLandscapesForTransport = null, requireMarine = false) {
       let routes = [];
       let queue = [[startId]];
-      
+
       while (queue.length > 0) {
         let path = queue.shift();
         let last = path[path.length - 1];
 
         if (last === endId) {
+          if (requireMarine) {
+            // Проверяем, что маршрут включает хотя бы одну морскую провинцию
+            const hasMarine = path.some(provinceId => isMarineProvince(provincesMap[provinceId]));
+            if (!hasMarine) continue;
+          }
           routes.push(path);
           continue;
         }
@@ -163,13 +208,67 @@ function updateResourcesAvailable(data, spreadsheet) {
       return routes;
     }
 
+    // Функция для поиска морских маршрутов, включающих как наземные, так и морские провинции
+    function findAllMarineRoutes(startId, endId, allowedProvinces, transportType, provincesMap) {
+      let routes = [];
+      let queue = [[startId]];
+
+      while (queue.length > 0) {
+        let path = queue.shift();
+        let last = path[path.length - 1];
+
+        if (last === endId) {
+          // Проверяем, что маршрут включает морские провинции и начинается и заканчивается на прибрежных
+          const provinceStart = provincesMap[path[0]];
+          const provinceEnd = provincesMap[path[path.length - 1]];
+          const hasMarine = path.some(provinceId => isMarineProvince(provincesMap[provinceId]));
+
+          if (isCoastalProvince(provinceStart) && isCoastalProvince(provinceEnd) && hasMarine) {
+            routes.push(path);
+          }
+          continue;
+        }
+
+        if (!provincesMap[last] || !provincesMap[last].neighbors) {
+          continue;
+        }
+
+        provincesMap[last].neighbors.forEach(neighborId => {
+          if (allowedProvinces.includes(neighborId) && !path.includes(neighborId)) {
+            let canAdd = true;
+
+            // Для морских маршрутов допускаем как наземные, так и морские провинции
+            // Дополнительные условия по планете
+            const neighborProvince = provincesMap[neighborId];
+            if (!neighborProvince || !neighborProvince.planet || !Array.isArray(neighborProvince.planet)) {
+              canAdd = false;
+            } else {
+              // Убедимся, что провинция находится на той же планете, что и начальная
+              const startPlanets = provincesMap[startId].planet.map(p => p.toLowerCase());
+              const neighborPlanets = neighborProvince.planet.map(p => p.toLowerCase());
+              const commonPlanets = startPlanets.filter(p => neighborPlanets.includes(p));
+              if (commonPlanets.length === 0) {
+                canAdd = false;
+              }
+            }
+
+            if (canAdd) {
+              queue.push([...path, neighborId]);
+            }
+          }
+        });
+      }
+
+      return routes;
+    }
+
     // Определение типов транспорта и категорий ресурсов
     const transportTypes = ["land", "air", "water", "space"]; // Упорядочены для логики обработки
     const resourceCategories = ["gas", "liquid", "goods", "service", "energy"];
 
     // Определение допустимых ландшафтов для каждого типа транспорта
     const allowedLandscapes = {
-      'water': ['ocean', 'sea'],
+      'water': [...coastalLandscapes, 'sea', 'ocean'], // Добавляем прибрежные ландшафты из настроек
       'land': ['land']
       // 'air' и 'space' не имеют ограничений по ландшафтам
     };
@@ -318,38 +417,26 @@ function updateResourcesAvailable(data, spreadsheet) {
             if (transportType === 'space') {
               // Для типа 'space' маршрут всегда прямой
               routes.push([capitalId, destinationId]);
-            } else if (transportType === 'air' || transportType === 'land' || transportType === 'water') {
-              // Для типов 'air', 'land', 'water' маршруты должны полностью находиться на одной планете
-              // и для 'land' и 'water' также учитывать ландшафты
-              const capitalProvince = provincesMap[capitalId];
-              const destinationProvince = provincesMap[destinationId];
-
-              // Определяем общие планеты между столицей и целевой провинцией
-              const commonPlanets = capitalProvince.planet.map(p => p.toLowerCase()).filter(p => destinationProvince.planet.map(dp => dp.toLowerCase()).includes(p));
-
-              // Для каждой общей планеты ищем маршруты, полностью находящиеся на этой планете
-              let transportRoutes = [];
-              commonPlanets.forEach(planet => {
-                // Фильтруем провинции, чтобы они находились на текущей планете
-                const provincesOnPlanet = allowedProvincesForTransportType.filter(provinceId => {
-                  const province = provincesMap[provinceId];
-                  return province.planet && Array.isArray(province.planet) &&
-                         province.planet.map(p => p.toLowerCase()).includes(planet);
-                });
-
-                // Ищем маршруты на текущей планете
-                const planetRoutes = findAllRoutes(
-                  capitalId,
-                  destinationId,
-                  provincesOnPlanet,
-                  transportType,
-                  [planet],
-                  allowedLandscapesForTransport // Передаём допустимые ландшафты для 'land' и 'water'
-                );
-                transportRoutes = transportRoutes.concat(planetRoutes);
-              });
-
-              routes = transportRoutes;
+            } else if (transportType === 'air' || transportType === 'land') {
+              // Для типов 'air' и 'land' используем существующую логику маршрутов
+              routes = findAllRoutes(
+                capitalId,
+                destinationId,
+                allowedProvincesForTransportType,
+                transportType,
+                planetFilter,
+                allowedLandscapesForTransport,
+                false // Не требуем наличие морских провинций
+              );
+            } else if (transportType === 'water') {
+              // Для типа 'water' используем специализированную функцию поиска маршрутов
+              routes = findAllMarineRoutes(
+                capitalId,
+                destinationId,
+                allowedProvincesForTransportType,
+                transportType,
+                provincesMap
+              );
             }
 
             if (routes.length === 0) {
@@ -357,7 +444,7 @@ function updateResourcesAvailable(data, spreadsheet) {
               return; // Переходим к следующей итерации
             }
 
-            // Определяем оптимальный маршрут
+            // Определение оптимального маршрута
             let optimalRoute = null;
             let maxMinValue = -Infinity;
 
