@@ -37,11 +37,14 @@ function loadSettings(spreadsheet) {
 }
 
 /**
- * Максимальные ограничения - загружаются из настроек
+ * Получение активной таблицы и загрузка настроек
  */
 const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 const settings = loadSettings(spreadsheet);
 
+/**
+ * Максимальные ограничения - загружаются из настроек
+ */
 const MAX_TOTAL_MESSAGES = settings['Максимальное количество сообщений'] || 1000;        // Общий лимит сообщений
 const MAX_CHARACTERS_PER_CELL = settings['Максимальное количество символов на ячейку'] || 50000;  // Лимит символов на ячейку
 
@@ -71,6 +74,23 @@ const WORD_COLORS = settings['Цвета слов'] || {
   "Ошибка": "#FF0000"        // Красный
   // Добавьте другие слова и цвета по необходимости
 };
+
+/**
+ * Цвета категорий - загружаются из настроек
+ */
+let CATEGORY_COLORS = settings['Цвета категорий'] || {
+  "Ошибка": "#FF0000",        // Красный
+  "Предупреждение": "#FFA500", // Оранжевый
+  "Постройки": "#0000FF",     // Синий
+  "Другие категории": "#000000" // Черный
+  // Добавьте другие категории и их цвета здесь
+};
+
+/**
+ * Извлечение дефолтного цвета категорий и удаление его из CATEGORY_COLORS
+ */
+const DEFAULT_CATEGORY_COLOR = CATEGORY_COLORS['default'] || "#000000"; // Черный по умолчанию
+delete CATEGORY_COLORS['default']; // Удаляем ключ 'default' из CATEGORY_COLORS
 
 /**
  * Вспомогательная функция для добавления сообщений об ошибках
@@ -192,41 +212,56 @@ function enforceTotalMessageLimit(finalMessages) {
     return finalMessages;
   }
   
-  // Необходимо удалить излишние сообщения
-  const excessMessages = totalMessages - MAX_TOTAL_MESSAGES;
+  // Сортировка по приоритету: сначала более высокие приоритеты (меньшие числа)
+  finalMessages.sort((a, b) => {
+    const categoryA = a.match(/^\[(.*?)\]/)[1];
+    const categoryB = b.match(/^\[(.*?)\]/)[1];
+    const priorityA = CATEGORY_PRIORITY[categoryA] || Number.MAX_SAFE_INTEGER;
+    const priorityB = CATEGORY_PRIORITY[categoryB] || Number.MAX_SAFE_INTEGER;
+    return priorityA - priorityB;
+  });
   
-  // Удаляем излишние сообщения начиная с конца
+  // Оставляем только первые MAX_TOTAL_MESSAGES сообщений
   const limitedMessages = finalMessages.slice(0, MAX_TOTAL_MESSAGES);
   
-  // Добавляем уведомление о превышении лимита
-  limitedMessages.push(`Достигнут лимит в ${MAX_TOTAL_MESSAGES} сообщений. Некоторые сообщения были опущены.`);
+  // Добавляем уведомление о превышении лимита, если оно ещё не добавлено
+  if (!limitedMessages.some(msg => msg.includes('Достигнут лимит'))) {
+    limitedMessages.push(`Достигнут лимит в ${MAX_TOTAL_MESSAGES} сообщений. Некоторые сообщения были опущены.`);
+  }
   
   return limitedMessages;
 }
 
 /**
- * Применяет цветовую маркировку к указанным словам в сообщении
- * @param {string} message - Текст сообщения
- * @returns {RichTextValue} - Объект RichTextValue с применёнными цветами
+ * Применяет цветовую маркировку к указанным словам в сообщении с учетом цвета категории.
+ * @param {string} message - Текст сообщения.
+ * @returns {RichTextValue} - Объект RichTextValue с применёнными цветами.
  */
 function applyWordColors(message) {
+  // Извлекаем категорию из сообщения
+  const categoryMatch = message.match(/^\[(.*?)\]/);
+  const category = categoryMatch ? categoryMatch[1] : null;
+  const categoryColor = CATEGORY_COLORS[category] || DEFAULT_CATEGORY_COLOR;
+  
   // Создаём новый RichTextValueBuilder и устанавливаем текст сообщения
   let builder = SpreadsheetApp.newRichTextValue().setText(message);
   
+  // Применяем цвет категории ко всему сообщению
+  builder = builder.setTextStyle(0, message.length, SpreadsheetApp.newTextStyle().setForegroundColor(categoryColor).build());
+  
   // Проходим по всем словам и их соответствующим цветам
   for (const [word, color] of Object.entries(WORD_COLORS)) {
-    let startIndex = 0;
-    
-    // Ищем все вхождения слова в сообщении
-    while (true) {
-      const foundIndex = message.indexOf(word, startIndex);
-      if (foundIndex === -1) break;
+    // Используем регулярное выражение для поиска всех вхождений слова (регистронезависимый)
+    const regex = new RegExp(word, 'gi');
+    let match;
+    while ((match = regex.exec(message)) !== null) {
+      const foundIndex = match.index;
+      const foundWord = match[0];
       
       // Применяем цвет к найденному слову
-      builder = builder.setTextStyle(foundIndex, foundIndex + word.length, SpreadsheetApp.newTextStyle().setForegroundColor(color).build());
+      builder = builder.setTextStyle(foundIndex, foundIndex + foundWord.length, SpreadsheetApp.newTextStyle().setForegroundColor(color).build());
       
-      // Продолжаем поиск с конца текущего найденного слова
-      startIndex = foundIndex + word.length;
+      // Продолжаем поиск
     }
   }
 
@@ -244,7 +279,8 @@ function addMessagesToRange4(messagesToAdd, spreadsheet) {
   
   const range = spreadsheet.getRangeByName(rangeName);
   if (!range) {
-    // Если диапазон не найден, невозможно добавить сообщение. Можно рассмотреть возможность создания диапазона или уведомления администратора.
+    // Если диапазон не найден, невозможно добавить сообщение. Добавляем ошибку в журнал.
+    logErrorToEventLog(`Диапазон "${rangeName}" не найден.`, spreadsheet);
     return;
   }
   
