@@ -1,14 +1,54 @@
 /**
- * Максимальные ограничения
+ * Загружает настройки из именованного диапазона "Настройки".
+ * @param {Spreadsheet} spreadsheet - Объект активной таблицы.
+ * @returns {Object} - Объект с загруженными настройками.
  */
-const MAX_TOTAL_MESSAGES = 1000;        // Общий лимит сообщений
-const MAX_CHARACTERS_PER_CELL = 50000;  // Лимит символов на ячейку
+function loadSettings(spreadsheet) {
+  const rangeName = 'Настройки';
+  const range = spreadsheet.getRangeByName(rangeName);
+  
+  if (!range) {
+    throw new Error(`Диапазон с именем "${rangeName}" не найден.`);
+  }
+  
+  const values = range.getValues();
+  const settings = {};
+  
+  values.forEach(row => {
+    const identifier = row[0];
+    const data = row[1];
+    
+    if (identifier && data) {
+      try {
+        // Попытка парсинга как JSON
+        settings[identifier] = JSON.parse(data);
+      } catch (e) {
+        // Если парсинг не удался, возможно это простой тип (число, строка)
+        if (!isNaN(data)) {
+          settings[identifier] = Number(data);
+        } else {
+          settings[identifier] = data;
+        }
+      }
+    }
+  });
+  
+  return settings;
+}
 
 /**
- * Карта приоритетов категорий
- * Меньшее число означает более высокий приоритет
+ * Максимальные ограничения - загружаются из настроек
  */
-const CATEGORY_PRIORITY = {
+const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+const settings = loadSettings(spreadsheet);
+
+const MAX_TOTAL_MESSAGES = settings['Максимальное количество сообщений'] || 1000;        // Общий лимит сообщений
+const MAX_CHARACTERS_PER_CELL = settings['Максимальное количество символов на ячейку'] || 50000;  // Лимит символов на ячейку
+
+/**
+ * Карта приоритетов категорий - загружается из настроек
+ */
+const CATEGORY_PRIORITY = settings['Приоритет категорий'] || {
   "Ошибка": 1,
   "Предупреждение": 2,
   "Постройки": 3,
@@ -16,27 +56,19 @@ const CATEGORY_PRIORITY = {
 };
 
 /**
- * Список отключённых категорий
- * Добавьте названия категорий, которые необходимо отключить
+ * Список отключённых категорий - загружается из настроек
  */
-const DISABLED_CATEGORIES = [
+const DISABLED_CATEGORIES = settings['Отключённые категории'] || [
   // Например, чтобы отключить категории "Предупреждение" и "Постройки", добавьте их сюда
   // "Предупреждение",
   // "Ошибка"
 ];
 
 /**
- * Слова и соответствующие им цвета для цветовой маркировки
+ * Слова и соответствующие им цвета для цветовой маркировки - загружаются из настроек
  */
-const WORD_COLORS = {
-  "не соответствует": "#FF0000",        // Красный
-  "Кирпичный завод": "#FFA500", // Оранжевый
-  "[Необходимые постройки в государстве]": "#0000FF",      // Синий
-  "Ландшафта": "#008000",
-  "Планеты": "#80FFA500",
-  "Культуры": "#240089",
-  "Постройка": "#808080",
-  "Львов": "#7F92FF",
+const WORD_COLORS = settings['Цвета слов'] || {
+  "Ошибка": "#FF0000"        // Красный
   // Добавьте другие слова и цвета по необходимости
 };
 
