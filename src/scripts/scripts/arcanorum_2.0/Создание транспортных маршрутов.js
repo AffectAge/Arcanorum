@@ -20,6 +20,10 @@ function updateResourcesAvailable(data, spreadsheet) {
     // Создаем более описательное название категории ресурсов
     const resourceCategoryDescriptions = {
       goods: 'Товары',
+	  gas: 'Газы',
+	  liquid: 'Жидкости',
+	  service: 'Услуги',
+	  energy: 'Энергия'
       // Добавьте другие категории ресурсов по необходимости
       // Например:
       // food: 'Продукты питания',
@@ -179,8 +183,8 @@ function updateResourcesAvailable(data, spreadsheet) {
     });
 
     // Отладочные сообщения для проверки разделения провинций
-    messages.push(`[Отладка][updateResourcesAvailable] stateProvinces: ${JSON.stringify(stateProvinces)}`);
-    messages.push(`[Отладка][updateResourcesAvailable] allowedOtherProvinces: ${JSON.stringify(allowedOtherProvinces)}`);
+    messages.push(`[Транспортные маршруты] Провинции нашего государства доступные транспортным маршрутам: ${JSON.stringify(stateProvinces)}`);
+    messages.push(`[Транспортные маршруты] Провинции других государств доступные нашим транспортным маршрутам: ${JSON.stringify(allowedOtherProvinces)}`);
 
     // Поиск всех столиц, группируя их по планетам
     const capitalsByPlanet = {}; // planet -> capitalProvinceId
@@ -529,7 +533,7 @@ function updateResourcesAvailable(data, spreadsheet) {
             if (routes.length === 0) {
               const transportTypeDesc = transportTypeDescriptions[transportType] || transportType;
               const resourceCategoryDesc = resourceCategoryDescriptions[resource] || resource;
-              messages.push(`[Транспортные маршруты][Информация] Нет доступных маршрутов от столицы ("${capitalId}") до провинции "${destinationId}" для транспорта "${transportTypeDesc}" и категории ресурсов "${resourceCategoryDesc}".`);
+              messages.push(`[Доступность транспортных маршрутов] Нет доступных маршрутов от столицы ("${capitalId}") до провинции "${destinationId}" для транспорта "${transportTypeDesc}" и категории ресурсов "${resourceCategoryDesc}".`);
               return; // Переходим к следующей итерации
             }
 
@@ -594,7 +598,7 @@ function updateResourcesAvailable(data, spreadsheet) {
                   } else {
                     typeObj.available[resource] = Math.min(typeObj.available[resource], maxMinValue);
                   }
-                  messages.push(`[Транспортные маршруты][Пропускная способность] Для провинции "${destinationId}" тип транспорта "${transportTypeDesc}" в категории ресурсов "${resourceCategoryDesc}" установлено значение доступности: ${typeObj.available[resource]} на основе маршрута "${optimalRoute.join(' -> ')}".`);
+                  messages.push(`[Пропускная способность транспортных маршрутов] Для провинции "${destinationId}" тип транспорта "${transportTypeDesc}" в категории ресурсов "${resourceCategoryDesc}" установлено значение доступности: ${typeObj.available[resource]} на основе маршрута "${optimalRoute.join(' -> ')}".`);
                 } else {
                   messages.push(`[Ошибка][updateResourcesAvailable] Провинция "${destinationId}" не содержит ключей "${transportType}" или "available.${resource}" в transport_infrastructure.`);
                 }
