@@ -194,7 +194,7 @@ function updateResourcesAvailable(data, spreadsheet) {
               messages.push(`[Предупреждение][updateResourcesAvailable] На планете "${planet}" уже существует столица "${capitalsByPlanet[planetLower]}". Дополнительная столица "${provinceId}" не будет учтена.`);
             } else {
               capitalsByPlanet[planetLower] = provinceId;
-              messages.push(`[Информация][updateResourcesAvailable] Найдена столица "${provinceId}" на планете "${planet}".`);
+              messages.push(`[Транспортные маршруты][Информация] Найдена столица "${provinceId}" на планете "${planet}".`);
             }
           });
         } else {
@@ -469,7 +469,7 @@ function updateResourcesAvailable(data, spreadsheet) {
                 if (allowedProvincesForTransportType.length === 0) {
                   const transportTypeDesc = transportTypeDescriptions[transportType] || transportType;
                   const resourceCategoryDesc = resourceCategoryDescriptions[resource] || resource;
-                  messages.push(`[Информация][updateResourcesAvailable] Нет провинций, подходящих для транспорта "${transportTypeDesc}" и категории ресурсов "${resourceCategoryDesc}".`);
+                  messages.push(`[Транспортные маршруты][Информация] Нет провинций, подходящих для транспорта "${transportTypeDesc}" и категории ресурсов "${resourceCategoryDesc}".`);
                   return; // Переходим к следующей итерации
                 }
               }
@@ -493,7 +493,7 @@ function updateResourcesAvailable(data, spreadsheet) {
 
               if (commonPlanets.length === 0) {
                 const transportTypeDesc = transportTypeDescriptions[transportType] || transportType;
-                messages.push(`[Информация][updateResourcesAvailable] Нет общих планет между столицей ("${capitalId}") и провинцией "${destinationId}" для транспорта "${transportTypeDesc}".`);
+                messages.push(`[Транспортные маршруты][Информация] Нет общих планет между столицей ("${capitalId}") и провинцией "${destinationId}" для транспорта "${transportTypeDesc}".`);
                 return; // Переходим к следующей итерации
               }
 
@@ -529,7 +529,7 @@ function updateResourcesAvailable(data, spreadsheet) {
             if (routes.length === 0) {
               const transportTypeDesc = transportTypeDescriptions[transportType] || transportType;
               const resourceCategoryDesc = resourceCategoryDescriptions[resource] || resource;
-              messages.push(`[Информация][updateResourcesAvailable] Нет доступных маршрутов от столицы ("${capitalId}") до провинции "${destinationId}" для транспорта "${transportTypeDesc}" и категории ресурсов "${resourceCategoryDesc}".`);
+              messages.push(`[Транспортные маршруты][Информация] Нет доступных маршрутов от столицы ("${capitalId}") до провинции "${destinationId}" для транспорта "${transportTypeDesc}" и категории ресурсов "${resourceCategoryDesc}".`);
               return; // Переходим к следующей итерации
             }
 
@@ -594,7 +594,7 @@ function updateResourcesAvailable(data, spreadsheet) {
                   } else {
                     typeObj.available[resource] = Math.min(typeObj.available[resource], maxMinValue);
                   }
-                  messages.push(`[Обновление][updateResourcesAvailable] Для провинции "${destinationId}" тип транспорта "${transportTypeDesc}" в категории ресурсов "${resourceCategoryDesc}" установлено значение доступности: ${typeObj.available[resource]} на основе маршрута "${optimalRoute.join(' -> ')}".`);
+                  messages.push(`[Транспортные маршруты][Пропускная способность] Для провинции "${destinationId}" тип транспорта "${transportTypeDesc}" в категории ресурсов "${resourceCategoryDesc}" установлено значение доступности: ${typeObj.available[resource]} на основе маршрута "${optimalRoute.join(' -> ')}".`);
                 } else {
                   messages.push(`[Ошибка][updateResourcesAvailable] Провинция "${destinationId}" не содержит ключей "${transportType}" или "available.${resource}" в transport_infrastructure.`);
                 }
@@ -604,7 +604,7 @@ function updateResourcesAvailable(data, spreadsheet) {
             } else {
               const transportTypeDesc = transportTypeDescriptions[transportType] || transportType;
               const resourceCategoryDesc = resourceCategoryDescriptions[resource] || resource;
-              messages.push(`[Информация][updateResourcesAvailable] Не найден оптимальный маршрут для провинции "${destinationId}", категории ресурсов "${resourceCategoryDesc}" и транспорта "${transportTypeDesc}".`);
+              messages.push(`[Транспортные маршруты][Информация] Не найден оптимальный маршрут для провинции "${destinationId}", категории ресурсов "${resourceCategoryDesc}" и транспорта "${transportTypeDesc}".`);
             }
           });
         });
