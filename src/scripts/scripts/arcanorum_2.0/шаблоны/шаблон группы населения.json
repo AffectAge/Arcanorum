@@ -36,22 +36,32 @@
         "neutral": 3500
       },
       "interest_groups": {
-        "традиционалисты": {
-          "radicals": 300,
-          "loyalists": 2000,
-          "neutral": 1700
-        },
-        "промышленники": {
+        "Церковь": {
           "radicals": 200,
           "loyalists": 1800,
           "neutral": 1000
         },
-        "интеллигенция": {
+        "Армия": {
+          "radicals": 200,
+          "loyalists": 1800,
+          "neutral": 1000
+        },
+        "Профсоюзы": {
+          "radicals": 200,
+          "loyalists": 1800,
+          "neutral": 1000
+        },
+        "Интеллигенция": {
           "radicals": 150,
           "loyalists": 1500,
           "neutral": 850
         },
-        "землевладельцы": {
+        "Капиталисты": {
+          "radicals": 150,
+          "loyalists": 1500,
+          "neutral": 850
+        },
+        "Землевладельцы": {
           "radicals": 100,
           "loyalists": 900,
           "neutral": 700
