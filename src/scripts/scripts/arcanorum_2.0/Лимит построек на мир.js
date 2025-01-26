@@ -43,7 +43,7 @@ function processWorldLimits(data, sheet, spreadsheet) {
     }
     
     // Парсинг провинций
-    const provinceMap = {}; // id -> province
+    const provinceMap = {}; // id -> owner
     provincesData.forEach((row, index) => {
       const cell = row[0];
       if (cell) {
@@ -59,10 +59,10 @@ function processWorldLimits(data, sheet, spreadsheet) {
           jsonString = jsonString.replace(/""/g, '"');
           
           const province = JSON.parse(jsonString);
-          if (province.id) {
-            provinceMap[province.id] = province;
+          if (province.id && province.owner) {
+            provinceMap[province.id] = province.owner;
           } else {
-            newMessages.push(`[Ошибка][processWorldLimits] Провинция в строке ${index + 1} не содержит ключа "id".`);
+            newMessages.push(`[Ошибка][processWorldLimits] Провинция в строке ${index + 1} не содержит ключей "id" или "owner".`);
           }
         } catch (e) {
           newMessages.push(`[Ошибка][processWorldLimits] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
@@ -84,20 +84,27 @@ function processWorldLimits(data, sheet, spreadsheet) {
       const cell = row[0];
       if (cell) {
         try {
-          const building = JSON.parse(cell);
-          const buildingName = building.building_name;
-          const provinceId = building.province_id;
+          const parsedData = JSON.parse(cell);
           
-          if (!buildingName || !provinceId) {
-            newMessages.push(`[Ошибка][processWorldLimits] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
-            return;
-          }
+          // **Изменение: Поддержка нескольких зданий в одной ячейке**
+          const buildingsArray = Array.isArray(parsedData) ? parsedData : [parsedData];
           
-          if (!buildingCounts[buildingName]) {
-            buildingCounts[buildingName] = 0;
-          }
-          
-          buildingCounts[buildingName] += 1;
+          buildingsArray.forEach((building, bIndex) => {
+            const buildingName = building.building_name;
+            const provinceId = building.province_id;
+            
+            if (!buildingName || !provinceId) {
+              newMessages.push(`[Ошибка][processWorldLimits] Здание в строке ${index + 1}, элемент ${bIndex + 1} не содержит ключи "building_name" или "province_id".`);
+              return;
+            }
+            
+            if (!buildingCounts[buildingName]) {
+              buildingCounts[buildingName] = 0;
+            }
+            
+            buildingCounts[buildingName] += 1;
+          });
+          // **Конец изменения**
         } catch (e) {
           newMessages.push(`[Ошибка][processWorldLimits] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
@@ -168,13 +175,10 @@ function processWorldLimits(data, sheet, spreadsheet) {
             template[listKey] = [];
             
             // Генерируем сообщение о удалении провинций
-            const provinceNames = removedProvinces.map(id => {
-              const province = provinceMap[id];
-              return province ? (province.name || province.id) : id;
-            }).join(', ');
+            const provinceIds = removedProvinces.join(', ');
             
             const description = listKeyDescriptions[listKey] || listKey;
-            newMessages.push(`[Критерии строительства][Лимит построек на мир] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для мира. Лимит: ${worldLimit} на мир.`);
+            newMessages.push(`[Критерии строительства][Лимит построек на мир] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceIds} из-за достижения лимита данной постройки для мира. Лимит: ${worldLimit} на мир.`);
           }
         });
         

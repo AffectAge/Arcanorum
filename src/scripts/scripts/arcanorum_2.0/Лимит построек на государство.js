@@ -43,7 +43,7 @@ function processStateLimits(data, sheet, spreadsheet) {
     }
     
     // Парсинг провинций и группировка по владельцам
-    const provinceMap = {}; // id -> province
+    const provinceMap = {}; // id -> owner
     const stateProvinces = []; // Провинции нашего государства
     const otherProvinces = []; // Провинции других государств
     
@@ -62,15 +62,15 @@ function processStateLimits(data, sheet, spreadsheet) {
           jsonString = jsonString.replace(/""/g, '"');
           
           const province = JSON.parse(jsonString);
-          if (province.id) {
-            provinceMap[province.id] = province;
+          if (province.id && province.owner) {
+            provinceMap[province.id] = province.owner;
             if (province.owner === stateName) {
               stateProvinces.push(province.id);
             } else {
               otherProvinces.push(province.id);
             }
           } else {
-            newMessages.push(`[Ошибка][processStateLimits] Провинция в строке ${index + 1} не содержит ключа "id".`);
+            newMessages.push(`[Ошибка][processStateLimits] Провинция в строке ${index + 1} не содержит ключа "id" или "owner".`);
           }
         } catch (e) {
           newMessages.push(`[Ошибка][processStateLimits] Ошибка при парсинге JSON из Провинции_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
@@ -87,37 +87,43 @@ function processStateLimits(data, sheet, spreadsheet) {
     
     // Подсчет построек по типам и государствам
     // Структура: { state_owner: { building_name: count } }
-    const buildingCountsByState = {}; // e.g., { "Империя Света": { "Кирпичный завод": 6 }, "Другая Империя": { ... } }
+    const buildingCountsByState = {}; // e.g., { "Украина": { "Кирпичный завод": 6 }, "Беларусь": { ... } }
     
     buildingsData.forEach((row, index) => {
       const cell = row[0];
       if (cell) {
         try {
-          const building = JSON.parse(cell);
-          const buildingName = building.building_name;
-          const provinceId = building.province_id;
-          
-          if (!buildingName || !provinceId) {
-            newMessages.push(`[Ошибка][processStateLimits] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
-            return;
-          }
-          
-          const province = provinceMap[provinceId];
-          if (!province) {
-            newMessages.push(`[Ошибка][processStateLimits] Провинция с ID "${provinceId}" для здания в строке ${index + 1} не найдена.`);
-            return;
-          }
-          
-          const owner = province.owner;
-          if (!buildingCountsByState[owner]) {
-            buildingCountsByState[owner] = {};
-          }
-          
-          if (!buildingCountsByState[owner][buildingName]) {
-            buildingCountsByState[owner][buildingName] = 0;
-          }
-          
-          buildingCountsByState[owner][buildingName] += 1;
+          const parsedData = JSON.parse(cell);
+
+          // **Изменение: Поддержка нескольких зданий в одной ячейке**
+          const buildingsArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+          buildingsArray.forEach((building, bIndex) => {
+            const buildingName = building.building_name;
+            const provinceId = building.province_id;
+            
+            if (!buildingName || !provinceId) {
+              newMessages.push(`[Ошибка][processStateLimits] Здание в строке ${index + 1}, элемент ${bIndex + 1} не содержит ключи "building_name" или "province_id".`);
+              return;
+            }
+            
+            const owner = provinceMap[provinceId];
+            if (!owner) {
+              newMessages.push(`[Ошибка][processStateLimits] Провинция с ID "${provinceId}" для здания в строке ${index + 1}, элемент ${bIndex + 1} не найдена.`);
+              return;
+            }
+            
+            if (!buildingCountsByState[owner]) {
+              buildingCountsByState[owner] = {};
+            }
+            
+            if (!buildingCountsByState[owner][buildingName]) {
+              buildingCountsByState[owner][buildingName] = 0;
+            }
+            
+            buildingCountsByState[owner][buildingName] += 1;
+          });
+          // **Конец изменения**
         } catch (e) {
           newMessages.push(`[Ошибка][processStateLimits] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
@@ -192,22 +198,18 @@ function processStateLimits(data, sheet, spreadsheet) {
                 template['allowed_building_state'] = [];
                 
                 // Генерируем сообщение о удалении провинций
-                const provinceNames = removedProvinces.map(id => {
-                  const province = provinceMap[id];
-                  return province ? province.name || province.id : id;
-                }).join(', ');
+                const provinceIds = removedProvinces.join(', ');
                 
                 const description = listKeyDescriptions['allowed_building_state'] || 'allowed_building_state';
                 
-                newMessages.push(`[Критерии строительства][Лимит построек на государство] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для одной провинции. Лимит: ${stateLimit} на государство.`);
+                newMessages.push(`[Критерии строительства][Лимит построек на государство] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceIds} из-за достижения лимита данной постройки для одной провинции. Лимит: ${stateLimit} на государство.`);
               }
             } else {
               // Удаляем провинции других государств из allowed_building_others
               if (Array.isArray(template['allowed_building_others']) && template['allowed_building_others'].length > 0) {
                 // Находим провинции, принадлежащие текущему owner
                 const provincesToRemove = otherProvinces.filter(id => {
-                  const province = provinceMap[id];
-                  return province && province.owner === owner;
+                  return provinceMap[id] === owner;
                 });
                 
                 if (provincesToRemove.length > 0) {
@@ -215,13 +217,10 @@ function processStateLimits(data, sheet, spreadsheet) {
                   const updatedList = originalList.filter(id => !provincesToRemove.includes(id));
                   template['allowed_building_others'] = updatedList;
                   
-                  const provinceNames = provincesToRemove.map(id => {
-                    const province = provinceMap[id];
-                    return province ? province.name || province.id : id;
-                  }).join(', ');
+                  const provinceIds = provincesToRemove.join(', ');
                   
                   const description = listKeyDescriptions['allowed_building_others'] || 'allowed_building_others';
-                  newMessages.push(`[Критерии строительства][Лимит построек на государство] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceNames} из-за достижения лимита данной постройки для одного государства. Лимит: ${stateLimit} на государство.`);
+                  newMessages.push(`[Критерии строительства][Лимит построек на государство] Постройка "${templateName}" больше не может быть построена ${description}: ${provinceIds} из-за достижения лимита данной постройки для одного государства. Лимит: ${stateLimit} на государство.`);
                 }
               }
             }
@@ -242,4 +241,73 @@ function processStateLimits(data, sheet, spreadsheet) {
   }
   
   return newMessages;
+} 
+
+/**
+ * Функция для оценки соответствия состояния государства критериям
+ * @param {Object} criteria - Критерии из state_required_buildings
+ * @param {Object} buildingCounts - Объект с общим количеством построек по типам во всех провинциях государства
+ * @returns {Boolean} - Возвращает true, если критерии выполнены, иначе false
+ */
+function evaluateStateCriteria(criteria, buildingCounts) {
+  if (typeof criteria !== 'object' || criteria === null) return false;
+
+  for (const operator in criteria) {
+    if (!criteria.hasOwnProperty(operator)) continue;
+
+    const value = criteria[operator];
+
+    switch (operator) {
+      case 'AND':
+        if (!Array.isArray(value)) return false;
+        return value.every(subCriteria => evaluateStateCriteria(subCriteria, buildingCounts));
+
+      case 'OR':
+        if (!Array.isArray(value)) return false;
+        return value.some(subCriteria => evaluateStateCriteria(subCriteria, buildingCounts));
+
+      case 'NOT':
+        if (!Array.isArray(value)) return false;
+        return !value.some(subCriteria => evaluateStateCriteria(subCriteria, buildingCounts));
+
+      case 'MIN_COUNT':
+        if (typeof value !== 'object') return false;
+        for (const building in value) {
+          if (!value.hasOwnProperty(building)) continue;
+          const minCount = value[building];
+          if ((buildingCounts[building] || 0) < minCount) return false;
+        }
+        return true;
+
+      case 'MAX_COUNT':
+        if (typeof value !== 'object') return false;
+        for (const building in value) {
+          if (!value.hasOwnProperty(building)) continue;
+          const maxCount = value[building];
+          if ((buildingCounts[building] || 0) > maxCount) return false;
+        }
+        return true;
+
+      case 'XNOR':
+        if (!Array.isArray(value) || value.length !== 2) return false;
+        const [first, second] = value;
+        const firstExists = (buildingCounts[first] || 0) > 0;
+        const secondExists = (buildingCounts[second] || 0) > 0;
+        return firstExists === secondExists;
+
+      case 'IMPLIES':
+        if (!Array.isArray(value) || value.length !== 2) return false;
+        const [antecedent, consequent] = value;
+        const antecedentExists = (buildingCounts[antecedent] || 0) > 0;
+        const consequentExists = (buildingCounts[consequent] || 0) > 0;
+        return !antecedentExists || consequentExists;
+
+      default:
+        // Если оператор неизвестен, возвращаем false
+        return false;
+    }
+  }
+
+  // Если критерий не содержит известных операторов
+  return false;
 }

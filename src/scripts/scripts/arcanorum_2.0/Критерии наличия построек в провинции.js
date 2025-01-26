@@ -89,26 +89,33 @@ function updateProvinceRequiredBuildings(data, spreadsheet) {
       const cell = row[0];
       if (cell) {
         try {
-          const building = JSON.parse(cell);
-          const buildingName = building.building_name;
-          const provinceId = building.province_id;
+          const parsedData = JSON.parse(cell);
 
-          if (!buildingName || !provinceId) {
-            newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Здание в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
-            return;
-          }
+          // **Изменение: Поддержка нескольких зданий в одной ячейке**
+          const buildingsArray = Array.isArray(parsedData) ? parsedData : [parsedData];
 
-          if (!buildingCountsByProvince[provinceId]) {
-            buildingCountsByProvince[provinceId] = {};
-          }
+          buildingsArray.forEach((building, bIndex) => {
+            const buildingName = building.building_name;
+            const provinceId = building.province_id;
 
-          if (!buildingCountsByProvince[provinceId][buildingName]) {
-            buildingCountsByProvince[provinceId][buildingName] = 0;
-          }
+            if (!buildingName || !provinceId) {
+              newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Здание в строке ${index + 1}, элемент ${bIndex + 1} не содержит ключи "building_name" или "province_id".`);
+              return;
+            }
 
-          buildingCountsByProvince[provinceId][buildingName] += 1;
+            if (!buildingCountsByProvince[provinceId]) {
+              buildingCountsByProvince[provinceId] = {};
+            }
+
+            if (!buildingCountsByProvince[provinceId][buildingName]) {
+              buildingCountsByProvince[provinceId][buildingName] = 0;
+            }
+
+            buildingCountsByProvince[provinceId][buildingName] += 1;
+          });
+          // **Конец изменения**
         } catch (e) {
-          newMessages.push(`[Ошибка][updateProvinceRequiredBuildings][updateProvinceRequiredBuildings] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
+          newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
         }
       }
     });
@@ -194,20 +201,26 @@ function updateProvinceRequiredBuildings(data, spreadsheet) {
       const provincesToRemoveState = currentMatchingState.filter(id => !matchingProvincesState.includes(id));
       if (provincesToRemoveState.length > 0) {
         template.matching_provinces_state = currentMatchingState.filter(id => matchingProvincesState.includes(id));
-        const provinceNames = provincesToRemoveState.join(', ');
-        newMessages.push(`[Постройки][Необходимые постройки в провинции] Наши провинции: ${provinceNames} больше не подходят для постройки "${templateName}" так как не соблюдаються критерии соседства построек.`);
+        const provinceNames = provincesToRemoveState.join(', '); // Отображаем ID вместо имен
+
+        newMessages.push(`[Постройки][Необходимые постройки в провинции] Наши провинции: ${provinceNames} больше не подходят для постройки "${templateName}" так как не соблюдаются критерии соседства построек.`);
       }
 
       // Определение провинций, которые нужно удалить из matching_provinces_others
       const provincesToRemoveOthers = currentMatchingOthers.filter(id => !matchingProvincesOthers.includes(id));
       if (provincesToRemoveOthers.length > 0) {
         template.matching_provinces_others = currentMatchingOthers.filter(id => matchingProvincesOthers.includes(id));
-        const provinceNames = provincesToRemoveOthers.join(', ');
-        newMessages.push(`[Постройки][Необходимые постройки в провинции] Провинции других государств: ${provinceNames} больше не подходят для постройки "${templateName}" так как не соблюдаються критерии соседства построек.`);
+        const provinceNames = provincesToRemoveOthers.join(', '); // Отображаем ID вместо имен
+
+        newMessages.push(`[Постройки][Необходимые постройки в провинции] Провинции других государств: ${provinceNames} больше не подходят для постройки "${templateName}" так как не соблюдаются критерии соседства построек.`);
       }
 
       // Обновление шаблона в data
-      data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+      try {
+        data['Постройки_Шаблоны'][templateInfo.row][0] = JSON.stringify(template);
+      } catch (e) {
+        newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Ошибка при сериализации JSON для шаблона "${templateName}" в строке ${templateInfo.row + 1}: ${e.message}`);
+      }
     });
 
   } catch (error) {
@@ -221,10 +234,13 @@ function updateProvinceRequiredBuildings(data, spreadsheet) {
  * Функция для оценки соответствия провинции критериям
  * @param {Object} criteria - Критерии из province_required_buildings
  * @param {Object} buildingCounts - Объект с количеством построек по типам в провинции
- * @returns {Boolean} - Возвращает true, если провинция соответствует критериям, иначе false
+ * @returns {Boolean} - Возвращает true, если провинция соответствует критериям или критерии отсутствуют, иначе false
  */
 function evaluateCriteria(criteria, buildingCounts) {
-  if (typeof criteria !== 'object' || criteria === null) return false;
+  // **Изменение: Если критерии отсутствуют или пусты, считаем их выполненными**
+  if (typeof criteria !== 'object' || criteria === null || Object.keys(criteria).length === 0) {
+    return true;
+  }
 
   for (const operator in criteria) {
     if (!criteria.hasOwnProperty(operator)) continue;
@@ -282,6 +298,6 @@ function evaluateCriteria(criteria, buildingCounts) {
     }
   }
 
-  // Если критерий не содержит известных операторов
-  return false;
+  // Если критерий не содержит известных операторов, возвращаем true
+  return true;
 }

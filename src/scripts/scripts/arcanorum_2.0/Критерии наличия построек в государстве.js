@@ -51,7 +51,6 @@ function updateStateRequiredBuildings(data, spreadsheet) {
     // Парсинг провинций и группировка по владельцам
     const provinceMap = {}; // id -> owner
     const stateProvinces = []; // Провинции нашего государства
-    const otherProvinces = []; // Провинции других государств
 
     provincesData.forEach((row, index) => {
       const cell = row[0];
@@ -84,27 +83,33 @@ function updateStateRequiredBuildings(data, spreadsheet) {
 
     buildingsData.forEach((row, index) => {
       const cell = row[0];
-      if (cell) {
-        try {
-          const building = JSON.parse(cell);
+      if (!cell) return;
+
+      try {
+        const parsedData = JSON.parse(cell);
+
+        // <-- Новое/Изменённое: поддержка массива зданий или одиночного объекта
+        const buildingsArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+        buildingsArray.forEach((building, idx) => {
           const buildingName = building.building_name;
           const provinceId = building.province_id;
 
           if (!buildingName || !provinceId) {
-            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Постройка в строке ${index + 1} не содержит ключи "building_name" или "province_id".`);
+            newMessages.push(`[Ошибка][updateStateRequiredBuildings] Постройка (строка ${index + 1}, элемент массива ${idx + 1}) не содержит ключи "building_name" или "province_id".`);
             return;
           }
 
+          // Если провинция принадлежит нашему государству
           if (provinceMap[provinceId] === stateName) {
             if (!buildingCounts[buildingName]) {
               buildingCounts[buildingName] = 0;
             }
             buildingCounts[buildingName] += 1;
           }
-          // Если постройка принадлежит другой империи, не делаем ничего
-        } catch (e) {
-          newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
-        }
+        });
+      } catch (e) {
+        newMessages.push(`[Ошибка][updateStateRequiredBuildings] Ошибка при парсинге JSON из Постройки_ОсновнаяИнформация, строка ${index + 1}: ${e.message}`);
       }
     });
 
@@ -156,8 +161,14 @@ function updateStateRequiredBuildings(data, spreadsheet) {
       const templateName = template.name;
       const stateCriteria = template.state_required_buildings;
 
-      if (typeof stateCriteria !== 'object' || stateCriteria === null) {
-        newMessages.push(`[Ошибка][updateStateRequiredBuildings] Шаблон "${templateName}" имеет некорректные критерии в "state_required_buildings".`);
+      // <-- Дополнительная проверка: если state_required_buildings — это пустой объект, критерий считается выполненным
+      // (В evaluateStateCriteria теперь тоже есть проверка, но можно дублировать для наглядности)
+      if (
+        typeof stateCriteria === 'object' &&
+        stateCriteria !== null &&
+        Object.keys(stateCriteria).length === 0
+      ) {
+        newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}" критерии state_required_buildings пусты — автоматически выполнено.`);
         return;
       }
 
@@ -175,13 +186,13 @@ function updateStateRequiredBuildings(data, spreadsheet) {
         if (template.matching_provinces_state && template.matching_provinces_state.length > 0) {
           const removedProvinces = template.matching_provinces_state.join(', ');
           template.matching_provinces_state = [];
-          newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}" больше не соответствует критериям наличия построек государства в провинциях нашей страны: ${removedProvinces}.`);
+          newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}" больше не соответствует критериям (очистка провинций нашей страны): ${removedProvinces}.`);
         }
 
         if (template.matching_provinces_others && template.matching_provinces_others.length > 0) {
           const removedProvinces = template.matching_provinces_others.join(', ');
           template.matching_provinces_others = [];
-          newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}" больше не соответствует критериям наличия построек государства в провинциях других стран: ${removedProvinces}.`);
+          newMessages.push(`[Постройки][Необходимые постройки в государстве]Постройка "${templateName}" больше не соответствует критериям (очистка провинций других стран): ${removedProvinces}.`);
         }
 
         // Обновление шаблона в data
@@ -203,7 +214,14 @@ function updateStateRequiredBuildings(data, spreadsheet) {
  * @returns {Boolean} - Возвращает true, если критерии выполнены, иначе false
  */
 function evaluateStateCriteria(criteria, buildingCounts) {
-  if (typeof criteria !== 'object' || criteria === null) return false;
+  if (typeof criteria !== 'object' || criteria === null) {
+    return false;
+  }
+
+  // <-- Новое/Изменённое: если объект пустой, сразу возвращаем true
+  if (Object.keys(criteria).length === 0) {
+    return true;
+  }
 
   for (const operator in criteria) {
     if (!criteria.hasOwnProperty(operator)) continue;
@@ -243,17 +261,21 @@ function evaluateStateCriteria(criteria, buildingCounts) {
 
       case 'XNOR':
         if (!Array.isArray(value) || value.length !== 2) return false;
-        const [first, second] = value;
-        const firstExists = (buildingCounts[first] || 0) > 0;
-        const secondExists = (buildingCounts[second] || 0) > 0;
-        return firstExists === secondExists;
+        {
+          const [first, second] = value;
+          const firstExists = (buildingCounts[first] || 0) > 0;
+          const secondExists = (buildingCounts[second] || 0) > 0;
+          return firstExists === secondExists;
+        }
 
       case 'IMPLIES':
         if (!Array.isArray(value) || value.length !== 2) return false;
-        const [antecedent, consequent] = value;
-        const antecedentExists = (buildingCounts[antecedent] || 0) > 0;
-        const consequentExists = (buildingCounts[consequent] || 0) > 0;
-        return !antecedentExists || consequentExists;
+        {
+          const [antecedent, consequent] = value;
+          const antecedentExists = (buildingCounts[antecedent] || 0) > 0;
+          const consequentExists = (buildingCounts[consequent] || 0) > 0;
+          return !antecedentExists || consequentExists;
+        }
 
       default:
         // Если оператор неизвестен, возвращаем false
@@ -261,6 +283,6 @@ function evaluateStateCriteria(criteria, buildingCounts) {
     }
   }
 
-  // Если критерий не содержит известных операторов
+  // Если критерий не содержит ни одного известного оператора
   return false;
 }
