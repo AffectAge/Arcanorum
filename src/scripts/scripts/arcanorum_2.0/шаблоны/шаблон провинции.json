@@ -1,11 +1,11 @@
 {
-  "id": "1",
+  "id": "Киев",
   "owner": "Украина",
-  "is_capital": false,
+  "is_capital": true,
   "free_arable_land": 0,
   "occupied_arable_land": 0,
   "total_arable_land": 0,
-  "landscapes": ["FOREST", "MOUNTAIN", "Forest"],
+  "landscapes": ["Суша"],
   "planet": ["Арканорум"],
   "province_culture": [],
   "province_religion": [],
@@ -28,26 +28,21 @@
       "quantity": 30
     }
   ],
-  "transport_infrastructure":
-  {"types":
-  [
-  {"type":"land",
-    "capacity":{"gas":800,"liquid":300,"goods":1000,"service":200,"energy":400},
-	"available":{"gas":450,"liquid":250,"goods":900,"service":180,"energy":350}
-	},
-  {"type":"air",
-    "capacity":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0},
-	"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}
-	},
-  {"type":"water",
-    "capacity":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0},
-	"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}
-	},
-  {"type":"space",
-    "capacity":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0},
-	"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}
+  "transport_infrastructure":{
+	"types":[
+	{"type":"land",
+	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
+	    "available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}},
+	{"type":"air",
+	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
+		"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}},
+	{"type":"water",
+	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
+		"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}},
+	{"type":"space",
+	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
+		"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}}
+	]
 	}
-]
-}
 }
 
