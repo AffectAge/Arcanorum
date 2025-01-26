@@ -233,21 +233,21 @@ function processBuildingsCriterias(data, sheet, spreadsheet) {
     template.allowed_building_others = matchingProvincesOthers;
     
     // Генерируем сообщения
-    const constructionName = template.name ? `"${template.name}"` : `"Неизвестно"`;
-    const constructionOwner = template.owner ? `"${template.owner}"` : `"Неизвестно"`;
+    const constructionName = template.name ? `${template.name}` : `"Неизвестно"`;
+    const constructionOwner = template.owner ? `${template.owner}` : `"Неизвестно"`;
     
     if (matchingProvincesState.length > 0 || matchingProvincesOthers.length > 0) {
       // Если есть подходящие провинции, генерируем сообщение о возможностях
-      newMessages.push(`[Постройки][Основные критерии] \nПостройка ${constructionName}, по основным критериям подходит для провинций:`);
+      newMessages.push(`[Основные критерии построек] \n🏗️ Постройка 🏭${constructionName}, по основным критериям подходит для 🗾 провинций:`);
       
       if (matchingProvincesState.length > 0) {
         const provincesStateList = matchingProvincesState.join(', ');
-        newMessages.push(`[Постройки][Основные критерии] \n- Нашего государства: ${provincesStateList}.`);
+        newMessages.push(`[Основные критерии построек] \n✅ Нашего государства: ${provincesStateList}.`);
       }
       
       if (matchingProvincesOthers.length > 0) {
         const provincesOthersList = matchingProvincesOthers.join(', ');
-        newMessages.push(`[Постройки][Основные критерии] \n- Других государств: ${provincesOthersList}.`);
+        newMessages.push(`[Основные критерии построек] \n✅ Других государств: ${provincesOthersList}.`);
       }
     }
     
