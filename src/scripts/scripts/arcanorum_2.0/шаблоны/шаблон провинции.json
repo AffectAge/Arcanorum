@@ -31,17 +31,17 @@
   "transport_infrastructure":{
 	"types":[
 	{"type":"land",
-	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
-	    "available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}},
+	    "capacity":{"Газы":200,"Жидкости":300,"Товары":400,"Услуги":500,"Энергия":600},
+	    "available":{"Газы":0,"Жидкости":0,"Товары":0,"Услуги":0,"Энергия":0}},
 	{"type":"air",
-	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
-		"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}},
+	    "capacity":{"Газы":200,"Жидкости":300,"Товары":400,"Услуги":500,"Энергия":600},
+		"available":{"Газы":0,"Жидкости":0,"Товары":0,"Услуги":0,"Энергия":0}},
 	{"type":"water",
-	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
-		"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}},
+	    "capacity":{"Газы":200,"Жидкости":200,"Товары":200,"Услуги":200,"Энергия":200},
+		"available":{"Газы":0,"Жидкости":0,"Товары":0,"Услуги":0,"Энергия":0}},
 	{"type":"space",
-	    "capacity":{"gas":100,"liquid":100,"goods":100,"service":100,"energy":100},
-		"available":{"gas":0,"liquid":0,"goods":0,"service":0,"energy":0}}
+	    "capacity":{"Газы":200,"Жидкости":300,"Товары":400,"Услуги":500,"Энергия":600},
+		"available":{"Газы":0,"Жидкости":0,"Товары":0,"Услуги":0,"Энергия":0}}
 	]
 	}
 }
