@@ -60,42 +60,50 @@ const TEXT_CRITERIA_KEYS = CHECK_FIELDS
  * @returns {Object} - Объект с обновленными данными и новыми сообщениями
  */
 function processBuildingsCriterias(data, sheet, spreadsheet) {
-  const range1Data = data['Переменные_Основные'];
+  const range1Data = data['Переменные'];
   const range2Data = data['Постройки_Шаблоны'];
   const range3Data = data['Провинции_ОсновнаяИнформация'];
   
   let newMessages = []; // Массив для хранения новых сообщений
   
-  // Проверяем наличие данных в Переменные_Основные
+  // Проверяем наличие данных в Переменные
   if (!range1Data || range1Data.length === 0 || !range1Data[0][0]) {
-    const errorMsg = 'Переменные_Основные пуст или не содержит данных.';
+    const errorMsg = 'Переменные пуст или не содержит данных.';
     newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
     return newMessages; // Возвращаем без изменений
   }
   
-  // Парсим JSON из первой ячейки Переменные_Основные и получаем state_name
-  let stateName;
-  try {
-    const rawData = range1Data[0][0];
-    
-    // Извлечение JSON с помощью регулярного выражения
-    const jsonMatch = rawData.match(/\{.*\}/);
+// Парсим JSON из Переменные и получаем state_name
+let stateName;
+try {
+  const targetIdentifier = 'Основные данные государства';
+  
+  // Ищем строку с нужным идентификатором
+  const targetRow = range1Data.find(row => row[0] === targetIdentifier);
+  
+  if (targetRow && targetRow[1]) {
+    // Извлекаем JSON из второго столбца
+    const jsonMatch = targetRow[1].match(/\{.*\}/);
     if (jsonMatch) {
       const range1Json = JSON.parse(jsonMatch[0]);
       stateName = range1Json.state_name;
+      
       if (!stateName) {
-        const errorMsg = 'Ключ "state_name" не найден в Переменные_Основные.';
+        const errorMsg = 'Ключ "state_name" не найден в Переменные.';
         newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
         return newMessages;
       }
     } else {
-      throw new Error('Не удалось извлечь JSON из содержимого Переменные_Основные.');
+      throw new Error('Не удалось извлечь JSON из содержимого Переменные.');
     }
-  } catch (e) {
-    const errorMsg = `Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`;
-    newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
-    return newMessages;
+  } else {
+    throw new Error(`Идентификатор "${targetIdentifier}" не найден в Переменные.`);
   }
+} catch (e) {
+  const errorMsg = `Ошибка при парсинге JSON из Переменные: ${e.message}`;
+  newMessages.push(`[Ошибка][processBuildingsCriterias] ${errorMsg}`);
+  return newMessages;
+}
   
   // Парсим все JSON из Постройки_Шаблоны (шаблоны) без фильтрации по owner
   const templates = [];

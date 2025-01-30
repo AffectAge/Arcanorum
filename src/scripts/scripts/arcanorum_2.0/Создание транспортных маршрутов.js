@@ -6,7 +6,7 @@
  * в `province.transport_infrastructure.types[].available[resource]`.
  *
  * @param {Object} data - объект с именованными диапазонами:
- *   - data['Переменные_Основные']
+ *   - data['Переменные']
  *   - data['Настройки']
  *   - data['Провинции_ОсновнаяИнформация']
  * @param {Spreadsheet} spreadsheet - активная таблица (при необходимости)
@@ -17,32 +17,49 @@ function updateResourcesAvailable(data, spreadsheet) {
 
   try {
     //--------------------------------------------------------------------------
-    // 1. Извлекаем данные из "Переменные_Основные"
+    // 1. Извлекаем данные из "Переменные"
     //--------------------------------------------------------------------------
-    const varsData = data['Переменные_Основные'];
+    const varsData = data['Переменные'];
     if (!varsData || varsData.length < 5) {
-      messages.push(`[Ошибка] Переменные_Основные должны иметь минимум 5 строк (state_name, ... [4] для accessible_countries).`);
+      messages.push(`[Ошибка] Переменные должны иметь минимум 5 строк (state_name, ... [4] для Доступные для транспорта страны).`);
       return messages;
     }
 
-    let stateName = '';
-    let accessibleCountries = [];
+    // 1. Получение state_name и Доступные для транспорта страны из Переменные
+let stateName = '';
+let accessibleCountries = [];
 
-    try {
-      // Строка 0: JSON вида {"state_name":"Империя"}
-      const rawVars = varsData[0][0];
-      // Ищем {...} внутри строки
-      const parsedVars = JSON.parse(rawVars.match(/\{.*\}/)[0]);
-      stateName = (parsedVars.state_name || '').toLowerCase();
-
-      // Строка 4: массив вида ["СтранаА","СтранаБ"]
-      const rawAcc = varsData[4][0];
-      const parsedAcc = JSON.parse(rawAcc);
-      accessibleCountries = parsedAcc.map(x => x.toLowerCase());
-    } catch(e) {
-      messages.push(`[Ошибка] Не удалось извлечь stateName/accessible_countries: ${e.message}`);
-      return messages;
+try {
+  // Поиск строки с идентификатором "Основные данные государства"
+  const stateRow = data['Переменные'].find(row => row[0] === 'Основные данные государства');
+  if (stateRow && stateRow[1]) {
+    const jsonMatch = stateRow[1].match(/\{.*\}/);
+    if (jsonMatch) {
+      const variablesJson = JSON.parse(jsonMatch[0]);
+      stateName = (variablesJson.state_name || '').toLowerCase();
+      if (!stateName) {
+        throw new Error('Ключ "state_name" отсутствует или пуст.');
+      }
+    } else {
+      throw new Error('Не удалось извлечь JSON из содержимого "Основные данные государства".');
     }
+  } else {
+    throw new Error('Идентификатор "Основные данные государства" не найден в "Переменные".');
+  }
+
+  // Поиск строки с идентификатором "Доступные для транспорта страны"
+  const accCountriesRow = data['Переменные'].find(row => row[0].toLowerCase() === 'доступные для транспорта страны');
+  if (accCountriesRow && accCountriesRow[1]) {
+    const parsedAcc = JSON.parse(accCountriesRow[1]);
+    accessibleCountries = Array.isArray(parsedAcc) ? parsedAcc.map(x => x.toLowerCase()) : [];
+  } else {
+    throw new Error('Идентификатор "Доступные для транспорта страны" не найден или пуст в "Переменные".');
+  }
+} catch (e) {
+  messages.push(`[Ошибка][updateResourcesAvailable] Ошибка при извлечении stateName или Доступные для транспорта страны: ${e.message}`);
+  return messages;
+}
+
 
     //--------------------------------------------------------------------------
     // 2. Извлекаем настройки (Настройки): transportTypes, resourceCategories,
@@ -450,7 +467,7 @@ function updateResourcesAvailable(data, spreadsheet) {
             }
           });
           // Выводим маршрут
-          messages.push(`[${resource}] 🗾 Провинция ${pId} может транспортировать: 📦${bottleneck} единиц продукции, маршрут: ${path.join('🢂')}`);
+          messages.push(`[Транспортные коридоры: ${resource}] 🗾 Провинция ${pId} может транспортировать: 📦${bottleneck} единиц продукции, маршрут: ${path.join('🢂')}`);
         } else {
           messages.push(`[${resource}] 🗾 Нет пути от провинции=${pId} до столицы=${capitalId}`);
         }

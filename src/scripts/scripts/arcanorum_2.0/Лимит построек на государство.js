@@ -9,31 +9,42 @@ function processStateLimits(data, sheet, spreadsheet) {
   let newMessages = [];
   
   try {
-    // 1. Получение state_name из Переменные_Основные
-    const variablesData = data['Переменные_Основные'];
+    // 1. Получение state_name из Переменные
+    const variablesData = data['Переменные'];
     if (!variablesData || variablesData.length === 0 || !variablesData[0][0]) {
-      newMessages.push(`[Ошибка][processStateLimits] Переменные_Основные пуст или не содержит данных.`);
+      newMessages.push(`[Ошибка][processStateLimits] Переменные пуст или не содержит данных.`);
       return newMessages;
     }
     
-    let stateName;
-    try {
-      const rawData = variablesData[0][0];
-      const jsonMatch = rawData.match(/\{.*\}/);
-      if (jsonMatch) {
-        const variablesJson = JSON.parse(jsonMatch[0]);
-        stateName = variablesJson.state_name;
-        if (!stateName) {
-          newMessages.push(`[Ошибка][processStateLimits] Ключ "state_name" не найден в Переменные_Основные.`);
-          return newMessages;
-        }
-      } else {
-        throw new Error('Не удалось извлечь JSON из содержимого Переменные_Основные.');
+    // 1. Получение state_name из Переменные
+let stateName;
+try {
+  const targetIdentifier = 'Основные данные государства';
+  
+  // Ищем строку с нужным идентификатором
+  const targetRow = data['Переменные'].find(row => row[0] === targetIdentifier);
+  
+  if (targetRow && targetRow[1]) {
+    // Извлекаем JSON из второго столбца
+    const jsonMatch = targetRow[1].match(/\{.*\}/);
+    if (jsonMatch) {
+      const variablesJson = JSON.parse(jsonMatch[0]);
+      stateName = variablesJson.state_name;
+      
+      if (!stateName) {
+        newMessages.push(`[Ошибка][processStateLimits] Ключ "state_name" не найден в Переменные.`);
+        return newMessages;
       }
-    } catch (e) {
-      newMessages.push(`[Ошибка][processStateLimits] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
-      return newMessages;
+    } else {
+      throw new Error('Не удалось извлечь JSON из содержимого Переменные.');
     }
+  } else {
+    throw new Error(`Идентификатор "${targetIdentifier}" не найден в Переменные.`);
+  }
+} catch (e) {
+  newMessages.push(`[Ошибка][processStateLimits] Ошибка при парсинге JSON из Переменные: ${e.message}`);
+  return newMessages;
+}
     
     // 2. Получение списка провинций
     const provincesData = data['Провинции_ОсновнаяИнформация'];

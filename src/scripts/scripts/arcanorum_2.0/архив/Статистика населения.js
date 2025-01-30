@@ -1,6 +1,6 @@
 /**
  * Функция для агрегации данных о населении для собственных и чужих провинций
- * и записи результатов в Переменные_Основные
+ * и записи результатов в Переменные
  * @param {Object} data - Объект с данными из именованных диапазонов
  * @param {Sheet} sheet - Активный лист
  * @param {Spreadsheet} spreadsheet - Активная таблица
@@ -10,10 +10,10 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
   const messages = [];
 
   try {
-    // Извлечение state_name из Переменные_Основные
-    const stateVariables = data['Переменные_Основные'];
+    // Извлечение state_name из Переменные
+    const stateVariables = data['Переменные'];
     if (!stateVariables || stateVariables.length === 0 || !stateVariables[0][0]) {
-      messages.push('[Ошибка] Именной диапазон "Переменные_Основные" пуст или не содержит данных.');
+      messages.push('[Ошибка] Именной диапазон "Переменные" пуст или не содержит данных.');
       return messages;
     }
 
@@ -24,11 +24,11 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
         stateName = stateData.state_name;
         // // messages.push(`[Отладка] state_name: ${stateName}`);
       } else {
-        messages.push('[Ошибка] В "Переменные_Основные" отсутствует ключ "state_name" или он не является строкой.');
+        messages.push('[Ошибка] В "Переменные" отсутствует ключ "state_name" или он не является строкой.');
         return messages;
       }
     } catch (e) {
-      messages.push(`[Ошибка] Парсинг JSON в "Переменные_Основные": ${e.message}`);
+      messages.push(`[Ошибка] Парсинг JSON в "Переменные": ${e.message}`);
       return messages;
     }
 
@@ -248,8 +248,8 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
     const resultJsonOther = JSON.stringify(aggregatedOther, null, 2);
     const resultJsonTotal = JSON.stringify(aggregatedTotal, null, 2); // Новый JSON для общей статистики
 
-    // Обновление данных в Переменные_Основные с добавлением ключей, если их нет
-    updateStateVariables(data['Переменные_Основные'], resultJsonOwn, resultJsonOther, resultJsonTotal, messages);
+    // Обновление данных в Переменные с добавлением ключей, если их нет
+    updateStateVariables(data['Переменные'], resultJsonOwn, resultJsonOther, resultJsonTotal, messages);
 
     return messages;
 
@@ -260,8 +260,8 @@ function aggregatePopulationDataWithInterestGroupDetails(data, sheet, spreadshee
 }
 
 /**
- * Вспомогательная функция для обновления Переменные_Основные с учетом наличия строк и ключей
- * @param {Array} stateVariables - Массив данных из Переменные_Основные
+ * Вспомогательная функция для обновления Переменные с учетом наличия строк и ключей
+ * @param {Array} stateVariables - Массив данных из Переменные
  * @param {string} resultJsonOwn - JSON строка для собственных провинций
  * @param {string} resultJsonOther - JSON строка для чужих провинций
  * @param {string} resultJsonTotal - JSON строка для общей статистики

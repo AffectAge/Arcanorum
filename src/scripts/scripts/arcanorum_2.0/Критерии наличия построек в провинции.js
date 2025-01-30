@@ -9,37 +9,41 @@ function updateProvinceRequiredBuildings(data, spreadsheet) {
 
   try {
     // 1. Получение state_name из первой строки Переменные_ОсновнаяИнформация
-    const variablesData = data['Переменные_Основные'];
+    const variablesData = data['Переменные'];
     if (!variablesData || variablesData.length === 0 || !variablesData[0][0]) {
       newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Переменные_ОсновнаяИнформация пуст или не содержит данных.`);
       return newMessages;
     }
 
-    let stateName;
-    try {
-      const rawData = variablesData[0][0];
-      // Убедимся, что rawData является строкой и содержит JSON
-      if (typeof rawData !== 'string') {
-        newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Содержимое первой ячейки Переменные_ОсновнаяИнформация не является строкой.`);
-        return newMessages;
-      }
-
-      const jsonString = rawData.trim();
-      if (!jsonString.startsWith('{') || !jsonString.endsWith('}')) {
-        newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Содержимое первой ячейки Переменные_ОсновнаяИнформация не является JSON-строкой.`);
-        return newMessages;
-      }
-
-      const variablesJson = JSON.parse(jsonString);
+    // 1. Получение state_name из Переменные
+let stateName;
+try {
+  const targetIdentifier = 'Основные данные государства';
+  
+  // Ищем строку с нужным идентификатором
+  const targetRow = data['Переменные'].find(row => row[0] === targetIdentifier);
+  
+  if (targetRow && targetRow[1]) {
+    // Извлекаем JSON из второго столбца
+    const jsonMatch = targetRow[1].match(/\{.*\}/);
+    if (jsonMatch) {
+      const variablesJson = JSON.parse(jsonMatch[0]);
       stateName = variablesJson.state_name;
+      
       if (!stateName) {
-        newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Ключ "state_name" не найден в Переменные_ОсновнаяИнформация.`);
+        newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Ключ "state_name" не найден в Переменные.`);
         return newMessages;
       }
-    } catch (e) {
-      newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Ошибка при парсинге JSON из Переменные_ОсновнаяИнформация: ${e.message}`);
-      return newMessages;
+    } else {
+      throw new Error('Не удалось извлечь JSON из содержимого Переменные.');
     }
+  } else {
+    throw new Error(`Идентификатор "${targetIdentifier}" не найден в Переменные.`);
+  }
+} catch (e) {
+  newMessages.push(`[Ошибка][updateProvinceRequiredBuildings] Ошибка при парсинге JSON из Переменные: ${e.message}`);
+  return newMessages;
+}
 
     // 2. Получение списка провинций
     const provincesData = data['Провинции_ОсновнаяИнформация'];

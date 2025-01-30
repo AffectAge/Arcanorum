@@ -8,25 +8,43 @@ function processRequiredResources(data, spreadsheet) {
   let messages = [];
   
   try {
-    // Извлечение stateName из Переменные_Основные
-    const variablesData = data['Переменные_Основные'];
+    // Извлечение stateName из Переменные
+    const variablesData = data['Переменные'];
     if (!variablesData || variablesData.length === 0 || !variablesData[0][0]) {
-      messages.push(`[Ошибка][processRequiredResources] Переменные_Основные пуст или не содержит stateName.`);
+      messages.push(`[Ошибка][processRequiredResources] Переменные пуст или не содержит stateName.`);
       return messages;
     }
     
-    let stateName;
-    try {
-      const variables = JSON.parse(variablesData[0][0]);
-      if (!variables.state_name) {
-        messages.push(`[Ошибка][processRequiredResources] Переменные_Основные не содержит ключа "state_name".`);
+    // 1. Получение state_name из Переменные
+let stateName;
+try {
+  const targetIdentifier = 'Основные данные государства';
+  
+  // Ищем строку с нужным идентификатором
+  const targetRow = data['Переменные'].find(row => row[0] === targetIdentifier);
+  
+  if (targetRow && targetRow[1]) {
+    // Извлекаем JSON из второго столбца
+    const jsonMatch = targetRow[1].match(/\{.*\}/);
+    if (jsonMatch) {
+      const variablesJson = JSON.parse(jsonMatch[0]);
+      stateName = variablesJson.state_name;
+      
+      if (!stateName) {
+        messages.push(`[Ошибка][processRequiredResources] Ключ "state_name" не найден в Переменные.`);
         return messages;
       }
-      stateName = variables.state_name;
-    } catch (e) {
-      messages.push(`[Ошибка][processRequiredResources] Ошибка при парсинге JSON из Переменные_Основные: ${e.message}`);
-      return messages;
+    } else {
+      throw new Error('Не удалось извлечь JSON из содержимого Переменные.');
     }
+  } else {
+    throw new Error(`Идентификатор "${targetIdentifier}" не найден в Переменные.`);
+  }
+} catch (e) {
+  messages.push(`[Ошибка][processRequiredResources] Ошибка при парсинге JSON из Переменные: ${e.message}`);
+  return messages;
+}
+
     
     // Клонирование данных для обновления
     let updatedTemplates = JSON.parse(JSON.stringify(data['Постройки_Шаблоны']));
