@@ -53,32 +53,46 @@ function processTurn(data, sheet, spreadsheet) {
   let allNewMessages = [];
   
   try {
-    // Функции на ограничение работы зданий(Шаблоны зданий)
-    // Обработка основных критериев построек
-    allNewMessages = allNewMessages.concat(processBuildingsCriterias(data, sheet, spreadsheet));
-    // Обработка критериев наличия необходимых построек в провинции
-    allNewMessages = allNewMessages.concat(updateProvinceRequiredBuildings(data, spreadsheet));
-    // Обработка критериев наличия необходимых построек в государстве
-    allNewMessages = allNewMessages.concat(updateStateRequiredBuildings(data, spreadsheet));
-
-    // ВАЖНО! Копирование списка провинций подходящих для работы в список провинций подходящих для строительства(Шаблоны зданий)
-    // ВАЖНО! Затем идут функции для обработки ограничений на строительство, они должны идти всегда после функций на ограничение работы зданий
-    allNewMessages = allNewMessages.concat(copyMatchingProvincesToAllowed(data, spreadsheet));
-    // Обработка лимита построек на провинцию
-    allNewMessages = allNewMessages.concat(processProvinceLimits(data, spreadsheet));
-    // Обработка лимита построек на государство
-    allNewMessages = allNewMessages.concat(processStateLimits(data, spreadsheet));
-    // Обработка лимита построек на мир
-    allNewMessages = allNewMessages.concat(processWorldLimits(data, spreadsheet));
-    // Обработка критериев наличия ресурсов
-    allNewMessages = allNewMessages.concat(processRequiredResources(data, spreadsheet));
-    // Обработка критериев наличия необходимого количества агрокультурных земель для строительства
-    allNewMessages = allNewMessages.concat(processArableLandRequirements(data, spreadsheet));
-    // Обработка критериев наличия необходимого количества рабочих для строительства
-    allNewMessages = allNewMessages.concat(processRequiredWorkers(data, spreadsheet));
-
-    allNewMessages = allNewMessages.concat(updateResourcesAvailable(data, spreadsheet));
-
+    // Массив с описанием функций для вызова и измерения времени
+    const functionsToRun = [
+      { name: 'Обработка основных критериев построек', func: () => processBuildingsCriterias(data, sheet, spreadsheet) },
+      { name: 'Критерии соседства зданий в провинции', func: () => updateProvinceRequiredBuildings(data, spreadsheet) },
+      { name: 'Критерии соседства зданий в государстве', func: () => updateStateRequiredBuildings(data, spreadsheet) },
+      // ВАЖНО! Копирование списка провинций подходящих для работы в список провинций подходящих для строительства(Шаблоны зданий)
+      // ВАЖНО! Затем идут функции для обработки ограничений на строительство, они должны идти всегда после функций на ограничение работы зданий
+      { name: 'Копирование подходящих провинций', func: () => copyMatchingProvincesToAllowed(data, spreadsheet) },
+      { name: 'Обработка лимита построек на провинцию', func: () => processProvinceLimits(data, spreadsheet) },
+      { name: 'Обработка лимита построек на государство', func: () => processStateLimits(data, spreadsheet) },
+      { name: 'Обработка лимита построек на мир', func: () => processWorldLimits(data, spreadsheet) },
+      { name: 'Обработка критериев наличия ресурсов в провинции', func: () => processRequiredResources(data, spreadsheet) },
+      { name: 'Обработка критериев наличия агрокультурных земель', func: () => processArableLandRequirements(data, spreadsheet) },
+      { name: 'Обработка критериев наличия рабочих', func: () => processRequiredWorkers(data, spreadsheet) },
+      { name: 'Построение транспортных маршрутов', func: () => updateResourcesAvailable(data, spreadsheet) }
+      // Добавляйте новые функции здесь, в нужном порядке
+    ];
+    
+    // Используем обычный цикл for для сохранения порядка
+    for (let i = 0; i < functionsToRun.length; i++) {
+      const { name, func } = functionsToRun[i];
+      try {
+        const start = new Date();
+        const result = func();
+        const end = new Date();
+        const duration = end - start; // Время в миллисекундах
+        const durationSec = (duration / 1000).toFixed(3);
+        allNewMessages.push(`[Выполнение функций] 🛠️${name} выполнена за ⏳${durationSec} секунд`);
+        
+        // Предполагается, что каждая функция возвращает массив сообщений
+        if (Array.isArray(result)) {
+          allNewMessages = allNewMessages.concat(result);
+        }
+      } catch (funcError) {
+        const errorMsg = `[Ошибка] ${name}: ${funcError.message}`;
+        allNewMessages.push(errorMsg);
+        // Можно также логировать ошибки отдельно, если требуется
+      }
+    }
+    
     // Фильтрация сообщений
     allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
     
