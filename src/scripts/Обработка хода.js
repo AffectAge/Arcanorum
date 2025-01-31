@@ -58,6 +58,7 @@ function processTurn(data, sheet, spreadsheet) {
   try {
     // Массив с описанием функций для вызова
     const functionsToRun = [
+      { name: 'Обработка приветствия GNN', func: () => processInitialMessages(data, sheet, spreadsheet) },
       { name: 'Обработка основных критериев построек', func: () => processBuildingsCriterias(data, sheet, spreadsheet) },
       { name: 'Критерии соседства зданий в провинции', func: () => updateProvinceRequiredBuildings(data, spreadsheet) },
       { name: 'Критерии соседства зданий в государстве', func: () => updateStateRequiredBuildings(data, spreadsheet) },
@@ -77,7 +78,7 @@ function processTurn(data, sheet, spreadsheet) {
       try {
         const start = Date.now();
         const result = func();
-        const duration = ((Date.now() - start)/1000).toFixed(3);
+        const duration = ((Date.now() - start)/1000).toFixed(2);
         allNewMessages.push(`[Уведомление] 🛠️ ${name} выполнена за ⏳${duration} сек.`);
         
         if (Array.isArray(result)) {

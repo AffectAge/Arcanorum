@@ -102,7 +102,7 @@ function logErrorToEventLog(message, spreadsheet) {
 }
 
 /**
- * Функция для категоризации сообщений с поддержкой двойных категорий
+ * Функция для категоризации сообщений с поддержкой двойных категорий и пробелов
  * @param {Array} messages - Массив сообщений
  * @returns {Object} - Объект с категориями как ключами и массивами сообщений как значениями
  */
@@ -110,15 +110,15 @@ function categorizeMessages(messages) {
   const categorized = {};
 
   messages.forEach(msg => {
-    // Регулярное выражение для поиска двойных категорий
-    const match = msg.match(/^(\[[^\]]+\])(\[[^\]]+\])?\s*(.*)$/);
+    // Регулярное выражение для поиска категории и текста после неё
+    const match = msg.match(/^(\[[^\]]+\])\s*(.*)$/);
     let category = "Без категории";
     let text = msg;
 
     if (match) {
-      // Если есть двойная категория, объединяем их
-      category = match[1] + (match[2] || '');
-      text = match[3] || msg;
+      // Если найдена категория, извлекаем её и текст
+      category = match[1];
+      text = match[2] || msg;
     }
 
     if (!categorized[category]) {
