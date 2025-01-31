@@ -270,62 +270,65 @@ function applyWordColors(message) {
 }
 
 /**
- * Вспомогательная функция для добавления сообщений в Журнал_Событий с учетом общего лимита и группировки по категориям
- * @param {Array} messagesToAdd - Массив новых сообщений для добавления
- * @param {Spreadsheet} spreadsheet - Объект активной таблицы
+ * Универсальная функция добавления сообщений в журнал
  */
-function addMessagesToRange4(messagesToAdd, spreadsheet) {
-  const rangeName = 'Журнал_Событий';
+function addMessagesToRange(messagesToAdd, spreadsheet, isGnn = false) {
+  const RANGE_NAME = isGnn ? 'Журнал_Событий_GNN' : 'Журнал_Событий';
+  const range = spreadsheet.getRangeByName(RANGE_NAME);
   
-  const range = spreadsheet.getRangeByName(rangeName);
   if (!range) {
-    // Если диапазон не найден, невозможно добавить сообщение. Добавляем ошибку в журнал.
-    logErrorToEventLog(`Диапазон "${rangeName}" не найден.`, spreadsheet);
+    console.error(`Диапазон "${RANGE_NAME}" не найден!`);
     return;
   }
-  
-  const sheet = range.getSheet(); // Получаем лист, на котором находится Журнал_Событий
-  
-  range.clearContent(); // Очищаем Журнал_Событий перед записью новых данных
-  
-  // Получаем существующие сообщения из Журнал_Событий
-  const existingData = range.getValues(); // Двумерный массив
-  const existingMessages = existingData
-    .flat() // Преобразуем двумерный массив в одномерный
-    .filter(msg => msg && msg.toString().trim() !== ''); // Убираем пустые ячейки
-  
-  // Разбиваем существующие сообщения на категории
-  const categorizedExistingMessages = categorizeMessages(existingMessages);
-  
-  // Разбиваем новые сообщения на категории
-  const categorizedNewMessages = categorizeMessages(messagesToAdd);
-  
-  // Объединяем существующие и новые сообщения по категориям
-  const combinedCategorizedMessages = mergeCategorizedMessages(categorizedExistingMessages, categorizedNewMessages);
-  
-  // Группируем сообщения по категориям с учетом лимита символов на ячейку и приоритетов категорий
-  const finalMessages = groupMessagesByCategory(combinedCategorizedMessages);
-  
-  // Учитываем общий лимит на количество сообщений
-  const limitedFinalMessages = enforceTotalMessageLimit(finalMessages);
-  
-  // Преобразуем массив сообщений в двумерный массив для записи с применением цветовой маркировки
-  const messagesForSheet = limitedFinalMessages.map(msg => [applyWordColors(msg)]);
-  
-  // Записываем обновленные сообщения обратно в Журнал_Событий
-  // Проверяем, достаточно ли строк в Журнал_Событий для записи
-  const numRowsToWrite = messagesForSheet.length;
-  const maxRows = range.getNumRows();
-  
-  if (numRowsToWrite > maxRows) {
-    // Если строк недостаточно, расширяем диапазон
-    const newRange = sheet.getRange(range.getRow(), range.getColumn(), numRowsToWrite, 1);
-    newRange.setRichTextValues(messagesForSheet);
-  } else {
-    // Иначе записываем только необходимые строки
-    range.offset(0, 0, numRowsToWrite, 1).setRichTextValues(messagesForSheet);
+
+  try {
+    // Очистка перед записью
+    range.clearContent();
+    
+    // Получение существующих сообщений
+    const existing = range.getValues()
+      .flat()
+      .filter(msg => msg.toString().trim() !== '');
+
+    // Обработка сообщений
+    const categorized = mergeCategorizedMessages(
+      categorizeMessages(existing),
+      categorizeMessages(messagesToAdd)
+    );
+    
+    const grouped = groupMessagesByCategory(categorized);
+    const limited = enforceTotalMessageLimit(grouped);
+    
+    // Подготовка данных для записи
+    const output = limited.map(msg => [applyWordColors(msg)]);
+    
+    // Запись с расширением диапазона при необходимости
+    if (output.length > range.getNumRows()) {
+      const newRange = range.getSheet().getRange(
+        range.getRow(),
+        range.getColumn(),
+        output.length,
+        1
+      );
+      newRange.setRichTextValues(output);
+    } else {
+      range.offset(0, 0, output.length, 1).setRichTextValues(output);
+    }
+    
+    range.setWrap(true);
+
+  } catch (error) {
+    console.error(`Ошибка записи в ${RANGE_NAME}:`, error);
   }
-  
-  // Включаем перенос текста (Wrap Text) для Журнал_Событий, чтобы отображались переводы строк
-  range.setWrap(true);
+}
+
+/**
+ * Функции-обертки для разных журналов
+ */
+function addMessagesToRange4(messages, spreadsheet) {
+  addMessagesToRange(messages, spreadsheet, false);
+}
+
+function addMessagesToRange5(messages, spreadsheet) {
+  addMessagesToRange(messages, spreadsheet, true);
 }

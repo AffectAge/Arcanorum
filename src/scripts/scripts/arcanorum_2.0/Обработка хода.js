@@ -49,63 +49,73 @@ function scanNamedRanges() {
  * @param {Sheet} sheet - Активный лист
  * @param {Spreadsheet} spreadsheet - Активная таблица
  */
+/**
+ * Основная функция обработки хода
+ */
 function processTurn(data, sheet, spreadsheet) {
   let allNewMessages = [];
   
   try {
-    // Массив с описанием функций для вызова и измерения времени
+    // Массив с описанием функций для вызова
     const functionsToRun = [
       { name: 'Обработка основных критериев построек', func: () => processBuildingsCriterias(data, sheet, spreadsheet) },
       { name: 'Критерии соседства зданий в провинции', func: () => updateProvinceRequiredBuildings(data, spreadsheet) },
       { name: 'Критерии соседства зданий в государстве', func: () => updateStateRequiredBuildings(data, spreadsheet) },
-      // ВАЖНО! Копирование списка провинций подходящих для работы в список провинций подходящих для строительства(Шаблоны зданий)
-      // ВАЖНО! Затем идут функции для обработки ограничений на строительство, они должны идти всегда после функций на ограничение работы зданий
       { name: 'Копирование подходящих провинций', func: () => copyMatchingProvincesToAllowed(data, spreadsheet) },
       { name: 'Обработка лимита построек на провинцию', func: () => processProvinceLimits(data, spreadsheet) },
       { name: 'Обработка лимита построек на государство', func: () => processStateLimits(data, spreadsheet) },
       { name: 'Обработка лимита построек на мир', func: () => processWorldLimits(data, spreadsheet) },
-      { name: 'Обработка критериев наличия ресурсов в провинции', func: () => processRequiredResources(data, spreadsheet) },
-      { name: 'Обработка критериев наличия агрокультурных земель', func: () => processArableLandRequirements(data, spreadsheet) },
+      { name: 'Обработка критериев наличия ресурсов', func: () => processRequiredResources(data, spreadsheet) },
+      { name: 'Обработка агрокультурных земель', func: () => processArableLandRequirements(data, spreadsheet) },
       { name: 'Обработка критериев наличия рабочих', func: () => processRequiredWorkers(data, spreadsheet) },
       { name: 'Построение транспортных маршрутов', func: () => updateResourcesAvailable(data, spreadsheet) }
-      // Добавляйте новые функции здесь, в нужном порядке
     ];
-    
-    // Используем обычный цикл for для сохранения порядка
+
+    // Выполнение всех функций по порядку
     for (let i = 0; i < functionsToRun.length; i++) {
       const { name, func } = functionsToRun[i];
       try {
-        const start = new Date();
+        const start = Date.now();
         const result = func();
-        const end = new Date();
-        const duration = end - start; // Время в миллисекундах
-        const durationSec = (duration / 1000).toFixed(3);
-        allNewMessages.push(`[Выполнение функций] 🛠️${name} выполнена за ⏳${durationSec} секунд`);
+        const duration = ((Date.now() - start)/1000).toFixed(3);
+        allNewMessages.push(`[Система] ${name} выполнена за ${duration} сек.`);
         
-        // Предполагается, что каждая функция возвращает массив сообщений
         if (Array.isArray(result)) {
-          allNewMessages = allNewMessages.concat(result);
+          allNewMessages.push(...result);
         }
-      } catch (funcError) {
-        const errorMsg = `[Ошибка] ${name}: ${funcError.message}`;
-        allNewMessages.push(errorMsg);
-        // Можно также логировать ошибки отдельно, если требуется
+      } catch (error) {
+        allNewMessages.push(`[Ошибка] В функции ${name}: ${error.message}`);
       }
     }
+
+    // Разделение сообщений на два журнала
+    const standardMessages = [];
+    const gnnMessages = [];
     
-    // Фильтрация сообщений
-    allNewMessages = allNewMessages.filter(msg => typeof msg === 'string');
-    
-    // Добавление сообщений в Журнал_Событий
-    if (allNewMessages.length > 0) {
-      addMessagesToRange4(allNewMessages, spreadsheet);
+    allNewMessages.forEach(msg => {
+      if (typeof msg === 'string') {
+        if (msg.startsWith('[GNN]')) {
+          const cleanMsg = msg.slice(5).trim(); // Удаляем [GNN]
+          gnnMessages.push(cleanMsg);
+        } else {
+          standardMessages.push(msg);
+        }
+      }
+    });
+
+    // Запись в журналы
+    if (standardMessages.length > 0) {
+      addMessagesToRange4(standardMessages, spreadsheet);
     }
-    
-    // Обновление диапазонов
+    if (gnnMessages.length > 0) {
+      addMessagesToRange5(gnnMessages, spreadsheet);
+    }
+
+    // Обновление данных
     updateRanges(data, spreadsheet);
-    
+
   } catch (error) {
-    const errorMessage = `[Ошибка] processTurn: ${error.message}`;
+    const errorMessage = `[Критическая Ошибка] processTurn: ${error.message}`;
     addMessagesToRange4([errorMessage], spreadsheet);
   }
 }
