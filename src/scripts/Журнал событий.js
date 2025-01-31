@@ -102,35 +102,32 @@ function logErrorToEventLog(message, spreadsheet) {
 }
 
 /**
- * Функция для категоризации сообщений
+ * Функция для категоризации сообщений с поддержкой двойных категорий
  * @param {Array} messages - Массив сообщений
  * @returns {Object} - Объект с категориями как ключами и массивами сообщений как значениями
  */
 function categorizeMessages(messages) {
   const categorized = {};
-  
+
   messages.forEach(msg => {
-    const match = msg.match(/^\[(.*?)\]\s*(.*)$/);
+    // Регулярное выражение для поиска двойных категорий
+    const match = msg.match(/^(\[[^\]]+\])(\[[^\]]+\])?\s*(.*)$/);
     let category = "Без категории";
     let text = msg;
-    
+
     if (match) {
-      category = match[1];
-      text = match[2];
+      // Если есть двойная категория, объединяем их
+      category = match[1] + (match[2] || '');
+      text = match[3] || msg;
     }
-    
-    // Пропускаем сообщения из отключённых категорий
-    if (DISABLED_CATEGORIES.includes(category)) {
-      return;
-    }
-    
+
     if (!categorized[category]) {
       categorized[category] = [];
     }
-    
+
     categorized[category].push(text);
   });
-  
+
   return categorized;
 }
 
