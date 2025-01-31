@@ -78,7 +78,7 @@ function processTurn(data, sheet, spreadsheet) {
         const start = Date.now();
         const result = func();
         const duration = ((Date.now() - start)/1000).toFixed(3);
-        allNewMessages.push(`[Система] ${name} выполнена за ${duration} сек.`);
+        allNewMessages.push(`[Уведомление] 🛠️ ${name} выполнена за ⏳${duration} сек.`);
         
         if (Array.isArray(result)) {
           allNewMessages.push(...result);
