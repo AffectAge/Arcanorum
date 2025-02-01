@@ -46,6 +46,12 @@
 "matching_provinces_others":["2"],
 "allowed_building_state":[],
 "allowed_building_others":["Провинция-Альфа"],
+"warehouse": { 
+    "items": [ 
+	{"name": "Железо", "current_quantity": 0, "current_expenses": 0, "current_incomes": 0, "reserve_level": 1000}, 
+	{"name": "Steel Bars", "current_quantity": 0, "current_expenses": 0, "current_incomes": 0, "reserve_level": 100} 
+	] 
+},
 "province_required_buildings": {
 "AND": [
 {
