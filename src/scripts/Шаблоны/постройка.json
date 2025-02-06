@@ -1,4 +1,10 @@
 {
   "building_name": "Кирпичный завод",
-  "province_id": "1"
+  "building_owner": "Украина",
+  "province_id": "1",
+  "status": "Активная",
+  "warehouse": {
+	"Железо": {"current_quantity": 40, "reserve_level": 10}
+},
+"trade_orders": []
 }
