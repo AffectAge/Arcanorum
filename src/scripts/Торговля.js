@@ -118,7 +118,7 @@ function processSalesForBuildings(data) {
             Logger.log(`[DEBUG] Проверяем товар: ${goodName}, Количество: ${goodData.current_quantity}, Резерв: ${goodData.reserve_level}`);
 
             if (goodData.current_quantity <= goodData.reserve_level) {
-              Logger.log(`[INFO] Недостаточно товара "${goodName}". Есть ${goodData.current_quantity}, резерв ${goodData.reserve_level}`);
+              Logger.log(`[INFO] Недостаточно товара "${goodName}".`);
               continue;
             }
 
@@ -136,7 +136,7 @@ function processSalesForBuildings(data) {
 
             // 🚛 Проверяем транспорт
             if ((province.total_transport.available[transportType] || 0) < sellQuantity) {
-              Logger.log(`[WARNING] Недостаточно транспорта "${transportType}" в провинции "${province.id}". Нужно ${sellQuantity}, доступно ${province.total_transport.available[transportType]}`);
+              Logger.log(`[WARNING] Недостаточно транспорта "${transportType}" в провинции "${province.id}".`);
               continue;
             }
 
@@ -145,20 +145,31 @@ function processSalesForBuildings(data) {
             for (let i = 0; i < marketData.length; i++) {
               let orders = JSON.parse(marketData[i][0] || "[]");
 
-              Logger.log(`[DEBUG] Проверяем рынок (строка ${i}): занято ${orders.length} / 40`);
-
               if (orders.length < 40) {
-                orders.push({
+                // ✅ Генерируем `order_id`
+                const orderId = Math.floor(10000000 + Math.random() * 90000000);
+
+                // ✅ Создаем ордер
+                const newOrder = {
                   name: goodName,
                   price: price,
-                  order_id: Math.floor(10000000 + Math.random() * 90000000),
+                  order_id: orderId,
                   transport_type: transportType,
                   country: stateName
-                });
+                };
 
+                // ✅ Добавляем ордер в рынок
+                orders.push(newOrder);
                 marketData[i][0] = JSON.stringify(orders);
+
+                // ✅ Теперь добавляем `order_id` в `trade_orders` здания
+                if (!Array.isArray(building.trade_orders)) {
+                  building.trade_orders = [];
+                }
+                building.trade_orders.push(orderId);
+
                 placed = true;
-                Logger.log(`[SUCCESS] Продан товар: ${goodName}, Кол-во: ${sellQuantity}, Цена: ${price}`);
+                Logger.log(`[SUCCESS] Продан товар: ${goodName}, Кол-во: ${sellQuantity}, Цена: ${price}, Order ID: ${orderId}`);
                 break;
               }
             }
@@ -172,17 +183,18 @@ function processSalesForBuildings(data) {
             province.total_transport.available[transportType] -= sellQuantity;
             building.warehouse[goodName].current_quantity = goodData.reserve_level;
 
-            Logger.log(`[INFO] Товар "${goodName}" продан. Остаток на складе: ${building.warehouse[goodName].current_quantity}, Остаток транспорта "${transportType}": ${province.total_transport.available[transportType]}`);
+            // 🔥 Обновляем данные в `data`
+            data['Провинции_ОсновнаяИнформация'][rowIndex][0] = JSON.stringify(province);
+            data['Постройки_ОсновнаяИнформация'][rowIndex][0] = JSON.stringify(buildingsArray);
+
+            Logger.log(`[INFO] Обновлены данные: провинция ${province.id}, здание ${building.building_name}, Trade Orders: ${JSON.stringify(building.trade_orders)}`);
+            hasSales = true;
           }
         });
       } catch (err) {
         Logger.log(`[ERROR] Ошибка обработки зданий в строке ${rowIndex + 1}: ${err.message}`);
       }
     });
-
-    if (!hasSales) {
-      Logger.log(`[INFO] Скрипт выполнился успешно, но продаж не было.`);
-    }
 
   } catch (error) {
     Logger.log(`[ERROR] ${error.message}`);
