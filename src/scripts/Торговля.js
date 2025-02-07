@@ -64,9 +64,10 @@ function processSalesForBuildings(data) {
       try {
         const parsedGood = JSON.parse(cell);
         goodsMap[parsedGood.good_name] = {
-          good_type: parsedGood.good_type,
-          current_price: parsedGood.current_price
-        };
+  good_type: parsedGood.good_type,
+  current_price: parsedGood.current_price,
+  allowed_export: parsedGood.allowed_export !== undefined ? parsedGood.allowed_export : true // По умолчанию разрешена продажа
+};
       } catch (err) {
         Logger.log(`[ERROR] Ошибка парсинга товаров в строке ${rowIndex + 1}: ${err.message}`);
       }
@@ -134,6 +135,13 @@ function processSalesForBuildings(data) {
 
             Logger.log(`[DEBUG] Товар "${goodName}" найден. Тип транспорта: ${transportType}, Цена: ${price}`);
 
+            // ❗ Проверяем флаг allowed_export
+if (!goodsInfo.allowed_export) {
+  Logger.log(`[WARNING] Продажа товара "${goodName}" запрещена (allowed_export: false).`);
+  newMessages.push(`[⚠️ Запрет торговли] Здание: ${building.building_name} 📍 Провинция: ${building.province_id} 🚫 Товар "${goodName}" запрещен к продаже.`);
+  continue;
+}
+
             // 🚛 Проверяем транспорт
             if ((province.total_transport.available[transportType] || 0) < sellQuantity) {
               Logger.log(`[WARNING] Недостаточно транспорта "${transportType}" в провинции "${province.id}".`);
@@ -153,6 +161,8 @@ function processSalesForBuildings(data) {
                 const newOrder = {
                   name: goodName,
                   price: price,
+                  income: 0,
+                  turns_left: 3,
                   order_id: orderId,
                   transport_type: transportType,
                   country: stateName
@@ -170,6 +180,7 @@ function processSalesForBuildings(data) {
 
                 placed = true;
                 Logger.log(`[SUCCESS] Продан товар: ${goodName}, Кол-во: ${sellQuantity}, Цена: ${price}, Order ID: ${orderId}`);
+                newMessages.push(`[⚖️ Торговля] 🏛️ Здание: ${building.building_name} 📍 Провинция: ${building.province_id} 📦 Продан товар: ${goodName} 🔢 Кол-во: ${sellQuantity} 💰 Цена: ${price} 🆔 Номер операции: ${orderId}`);
                 break;
               }
             }
