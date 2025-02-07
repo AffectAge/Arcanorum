@@ -1,4 +1,5 @@
 function processSalesForBuildings(data) {
+
   const newMessages = [];
   Logger.log("[INFO] Начало работы processSalesForBuildings");
 
