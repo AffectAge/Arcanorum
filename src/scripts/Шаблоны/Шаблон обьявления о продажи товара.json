@@ -1,0 +1,12 @@
+[
+    {
+	"name":"Железо",
+	"price":10,
+	"availableQuantity":1000,
+	"income":0,
+	"turns_left":3,
+	"order_id":95297659,
+	"transport_type":"Газы",
+	"country":"Украина"
+	}
+]

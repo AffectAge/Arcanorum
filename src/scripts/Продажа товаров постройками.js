@@ -162,6 +162,7 @@ if (!goodsInfo.allowed_export) {
                 const newOrder = {
                   name: goodName,
                   price: price,
+                  availableQuantity: sellQuantity,
                   income: 0,
                   turns_left: 3,
                   order_id: orderId,

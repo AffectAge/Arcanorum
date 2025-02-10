@@ -194,6 +194,18 @@ function processPurchaseGoodsForBuildings(data) {
               }
               tradePartners[order.country].allowed_goods[goodName].tariff_income += purchaseAmount * Number(order.price);
 
+              // Списываем соответствующее количество транспорта у торгового партнёра
+              if (
+  tradePartners[order.country].total_transport &&
+  tradePartners[order.country].total_transport.available &&
+  typeof tradePartners[order.country].total_transport.available[transportType] === 'number'
+) {
+  tradePartners[order.country].total_transport.available[transportType] -= purchaseAmount;
+} else {
+  Logger.log(`[WARNING] Не удалось списать транспорт типа "${transportType}" для страны ${order.country}`);
+}
+
+
               // Обновляем данные рыночного заказа:
               order.availableQuantity = availableQuantity - purchaseAmount;
               if (order.income === undefined) {
