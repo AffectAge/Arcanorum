@@ -1,29 +1,22 @@
 [
-{"country":"Россия",
-"total_transport":{
-	"available":{
-		"Газы":413520,
-		"Товары":20,
-		"Услуги":20,
-		"Энергия":20
-		}
-	},
-	"allowed_goods":{
-		"Железо":{
-			"imported":0,
-			"exported":0,
-			"tariff":5,
-			"tariff_income":0},
-		"Древесина":{
-			"imported":400,
-			"exported":200,
-			"tariff":3,
-			"tariff_income":600},
-		"Золото":{
-			"imported":200,
-			"exported":150,
-			"tariff":10,
-			"tariff_income":500},
-	}
-}
+  {
+    "country": "Украина",
+    "total_transport": {
+      "available": {
+        "Газы": 10000,
+        "Товары": 10000,
+        "Жидкости": 10000,
+        "Услуги": 10000,
+        "Энергия": 10000
+      }
+    },
+    "allowed_goods": {
+      "Железо": {
+        "imported": 0,
+        "exported": 0,
+        "tariff": 1.2,
+        "tariff_income": 0
+      }
+    }
+  }
 ]
