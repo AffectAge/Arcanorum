@@ -192,7 +192,7 @@ function processPurchaseGoodsForBuildings(data) {
               if (tradePartners[order.country].allowed_goods[goodName].tariff_income === undefined) {
                 tradePartners[order.country].allowed_goods[goodName].tariff_income = 0;
               }
-              tradePartners[order.country].allowed_goods[goodName].tariff_income += purchaseAmount * Number(order.price);
+              tradePartners[order.country].allowed_goods[goodName].tariff_income += purchaseAmount * (order.finalPrice - order.price);
 
               // Списываем соответствующее количество транспорта у торгового партнёра
               if (
