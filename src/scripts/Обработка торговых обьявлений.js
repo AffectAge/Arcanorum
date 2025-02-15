@@ -45,6 +45,47 @@ function processBuildingTradeOrders(data) {
       }
     });
 
+    // Собираем все order_id из trade_orders наших построек
+    const ourOrderIds = new Set();
+    buildingsData.forEach((buildingRow) => {
+      const cell = buildingRow[0];
+      if (!cell) return;
+
+      try {
+        const buildings = JSON.parse(cell);
+        buildings.forEach(building => {
+          if (building.building_owner === stateName && building.status === "Активная" && building.trade_orders) {
+            building.trade_orders.forEach(orderId => ourOrderIds.add(orderId));
+          }
+        });
+      } catch (err) {
+        Logger.log(`[ERROR] Ошибка обработки зданий: ${err.message}`);
+      }
+    });
+
+    // Удаляем ордера на рынке, которые принадлежат нашей стране, но не найдены в наших trade_orders
+    marketData.forEach((marketRow, rowIndex) => {
+      let orders = [];
+      try {
+        orders = JSON.parse(marketRow[0] || "[]");
+      } catch (e) {
+        return;
+      }
+
+      const ordersToKeep = [];
+      orders.forEach(order => {
+        if (order.country === stateName && !ourOrderIds.has(order.order_id)) {
+          newMessages.push(`[🗑️ Удален] Ордер ${order.order_id}: принадлежит нашей стране, но не найден в trade_orders.`);
+        } else {
+          ordersToKeep.push(order);
+        }
+      });
+
+      if (orders.length !== ordersToKeep.length) {
+        marketRow[0] = JSON.stringify(ordersToKeep);
+      }
+    });
+
     // -------------------------------------------------
     // Обрабатываем здания и их ордеры
     // -------------------------------------------------
