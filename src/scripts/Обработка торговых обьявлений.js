@@ -1,9 +1,11 @@
 function processBuildingTradeOrders(data) {
   const newMessages = [];
-  Logger.log("[INFO] Начало работы processBuildingTradeOrders");
+  Logger.log("[INFO] Начало работы processSalesForBuildings");
 
   try {
-    // Загружаем данные о государстве
+    // -------------------------------------------------
+    // 0. Загружаем данные
+    // -------------------------------------------------
     let stateName;
     try {
       const targetIdentifier = 'Основные данные государства';
@@ -27,100 +29,107 @@ function processBuildingTradeOrders(data) {
     Logger.log(`[INFO] Государство: ${stateName}`);
 
     // Загружаем таблицы
-    const buildingsData = data['Постройки_ОсновнаяИнформация'] || [];
+    const provincesData = data['Провинции_ОсновнаяИнформация'] || [];
     const marketData = data['Международный_Рынок'] || [];
+    const buildingsData = data['Постройки_ОсновнаяИнформация'] || [];
 
-    Logger.log(`[INFO] Загружено зданий: ${buildingsData.length}`);
-    Logger.log(`[INFO] Загружено строк рынка: ${marketData.length}`);
+    // Парсим провинции
+    const provinceMap = {};
+    provincesData.forEach((row) => {
+      if (!row[0]) return;
+      try {
+        const province = JSON.parse(row[0]);
+        provinceMap[province.id] = province;
+      } catch (err) {
+        Logger.log(`[ERROR] Ошибка парсинга провинции: ${err.message}`);
+      }
+    });
 
     // -------------------------------------------------
-    // 1. Обрабатываем постройки
+    // Обрабатываем здания и их ордеры
     // -------------------------------------------------
-    buildingsData.forEach((row, rowIndex) => {
-      const cell = row[0];
-      if (!cell || cell.trim() === "") return;
+    buildingsData.forEach((buildingRow, rowIndex) => {
+      const cell = buildingRow[0];
+      if (!cell) return;
 
       try {
-        Logger.log(`[DEBUG] Исходные данные постройки: ${cell}`);
+        const buildings = JSON.parse(cell);
+        let updated = false;
 
-        const buildingsArray = JSON.parse(cell);
-        if (!Array.isArray(buildingsArray) || buildingsArray.length === 0) {
-          Logger.log(`[ERROR] Данные здания пустые или некорректны`);
-          return;
-        }
+        buildings.forEach(building => {
+          if (building.building_owner !== stateName || building.status !== "Активная") return;
+          if (!building.trade_orders || building.trade_orders.length === 0) return;
 
-        buildingsArray.forEach((building, bIndex) => {
-          if (building.building_owner !== stateName || !Array.isArray(building.trade_orders)) {
-            return;
-          }
-
-          Logger.log(`[INFO] Обрабатываем торговые объявления для здания: ${building.building_name}`);
-
-          // Проходим по каждому объявлению
-          building.trade_orders = building.trade_orders.filter(orderId => {
+          const ordersToRemove = [];
+          building.trade_orders.forEach(orderId => {
             let orderFound = false;
 
-            for (let i = 0; i < marketData.length; i++) {
-              let orders = JSON.parse(marketData[i][0] || "[]");
-
-              const orderIndex = orders.findIndex(order => order.order_id === orderId);
-              if (orderIndex === -1) continue;
-
-              orderFound = true;
-              const order = orders[orderIndex];
-
-              // 📥 Переводим доход в постройку
-              if (!building.incomes) {
-                building.incomes = 0;
-              }
-              building.incomes += order.income;
-              order.income = 0;
-
-              Logger.log(`[SUCCESS] Доход ${order.income} переведен в ${building.building_name}`);
-
-              // 🏛 Проверяем availableQuantity
-              if (order.availableQuantity === 0) {
-                orders.splice(orderIndex, 1);
-                Logger.log(`[INFO] Объявление ${orderId} удалено (товар распродан)`);
-                return false;
+            // Поиск ордера на рынке
+            for (let mRow = 0; mRow < marketData.length; mRow++) {
+              const marketRow = marketData[mRow];
+              let orders = [];
+              try {
+                orders = JSON.parse(marketRow[0] || "[]");
+              } catch (e) {
+                continue;
               }
 
-              // ⏳ Проверяем turns_left
-              if (order.turns_left === 0) {
-                // Возвращаем товар в постройку
-                if (!building.warehouse[order.name]) {
-                  building.warehouse[order.name] = { current_quantity: 0, reserve_level: 0 };
+              for (let oIdx = 0; oIdx < orders.length; oIdx++) {
+                const order = orders[oIdx];
+                if (order.order_id !== orderId) continue;
+
+                orderFound = true;
+                // Шаг 3: Перенос доходов
+                if (order.income > 0) {
+                  building.incomes = (building.incomes || 0) + order.income;
+                  order.income = 0;
                 }
-                building.warehouse[order.name].current_quantity += order.availableQuantity;
 
-                // Удаляем объявление
-                orders.splice(orderIndex, 1);
-                Logger.log(`[INFO] Объявление ${orderId} удалено (истек срок размещения), товар возвращен`);
-                return false;
+                // Шаг 4: Проверка количества
+                if (order.availableQuantity <= 0) {
+                  orders.splice(oIdx, 1);
+                  ordersToRemove.push(orderId);
+                  newMessages.push(`[🗑️ Удален] Ордер ${orderId}: товар закончился.`);
+                } else {
+                  // Шаг 5: Проверка ходов
+                  if (order.turns_left === 0) {
+                    // Возврат товара на склад здания
+                    if (!building.warehouse[order.name]) {
+                      building.warehouse[order.name] = { current_quantity: 0 };
+                    }
+                    building.warehouse[order.name].current_quantity += order.availableQuantity;
+                    orders.splice(oIdx, 1);
+                    ordersToRemove.push(orderId);
+                    newMessages.push(`[🔄 Возврат] Ордер ${orderId}: товар возвращен на склад.`);
+                  } else {
+                    order.turns_left--;
+                    orders[oIdx] = order;
+                    newMessages.push(`[⏳ Ход] Ордер ${orderId}: осталось ${order.turns_left} ходов.`);
+                  }
+                }
+
+                marketRow[0] = JSON.stringify(orders);
+                break;
               }
-
-              // ⏬ Уменьшаем turns_left
-              order.turns_left -= 1;
-              Logger.log(`[INFO] Объявление ${orderId}: turns_left уменьшено до ${order.turns_left}`);
-
-              // Сохраняем обновленные данные рынка
-              marketData[i][0] = JSON.stringify(orders);
-              return true;
+              if (orderFound) break;
             }
 
             if (!orderFound) {
-              Logger.log(`[WARNING] Объявление ${orderId} не найдено на рынке, удаляем`);
-              return false;
+              ordersToRemove.push(orderId);
+              newMessages.push(`[⚠️ Не найден] Ордер ${orderId} не существует.`);
             }
-
-            return true;
           });
 
-          // Обновляем данные в `data`
-          data['Постройки_ОсновнаяИнформация'][rowIndex][0] = JSON.stringify(buildingsArray);
+          // Удаление обработанных ордеров
+          building.trade_orders = building.trade_orders.filter(id => !ordersToRemove.includes(id));
+          updated = true;
         });
+
+        if (updated) {
+          buildingRow[0] = JSON.stringify(buildings);
+        }
       } catch (err) {
-        Logger.log(`[ERROR] Ошибка обработки зданий в строке ${rowIndex + 1}: ${err.message}`);
+        Logger.log(`[ERROR] Ошибка обработки зданий: ${err.message}`);
       }
     });
 
