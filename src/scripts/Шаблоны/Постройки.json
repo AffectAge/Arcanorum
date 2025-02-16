@@ -3,8 +3,13 @@
   "building_owner": "Украина",
   "province_id": "1",
   "status": "Активная",
+  "building_level": 3,
+  "building_modifiers": {
+      "land_efficiency": 1.0,
+      "extraction_efficiency": 1.5
+    },
   "warehouse": {
 	"Железо": {"current_quantity": 40, "reserve_level": 10}
-},
+  },
 "trade_orders": []
 }
