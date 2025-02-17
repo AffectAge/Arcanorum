@@ -6,6 +6,8 @@
   "building_level": 3,
   "building_modifiers": {
       "land_efficiency": 1.0,
+	  "consumption_efficiency": 2.0,
+	  "production_efficiency": 2.0,
       "extraction_efficiency": 1.5
     },
   "warehouse": {

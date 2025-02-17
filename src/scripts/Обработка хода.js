@@ -6,7 +6,7 @@ function scanNamedRanges() {
   const sheet = spreadsheet.getActiveSheet(); // Получаем активный лист
   
   // Список именованных диапазонов, которые нужно прочитать (исключаем Журнал_Событий)
-  const namedRanges = ['Переменные', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация', 'Постройки_ОсновнаяИнформация', 'Население_ОсновнаяИнформация', 'Настройки'];
+  const namedRanges = ['Переменные', 'Международный_Рынок', 'Торговые_Партнёры', 'Товары', 'Постройки_Шаблоны', 'Провинции_ОсновнаяИнформация', 'Постройки_ОсновнаяИнформация', 'Население_ОсновнаяИнформация', 'Настройки'];
   
   // Объект для хранения данных из диапазонов
   let data = {};
@@ -58,18 +58,34 @@ function processTurn(data, sheet, spreadsheet) {
   try {
     // Массив с описанием функций для вызова
     const functionsToRun = [
+      // Функции которые должны запускаться перед основными
       { name: 'Обработка приветствия GNN', func: () => processInitialMessages(data, sheet, spreadsheet) },
+
+      // Проверка основных критериев построек и формирование списка доступных для работы зданий провинций
       { name: 'Обработка основных критериев построек', func: () => processBuildingsCriterias(data, sheet, spreadsheet) },
       { name: 'Критерии соседства зданий в провинции', func: () => updateProvinceRequiredBuildings(data, spreadsheet) },
       { name: 'Критерии соседства зданий в государстве', func: () => updateStateRequiredBuildings(data, spreadsheet) },
       { name: 'Копирование подходящих провинций', func: () => copyMatchingProvincesToAllowed(data, spreadsheet) },
+
+      // Проверка критериев и формирование списка провинций в которых можно построить здания.
+      // Эти функции всегда должны идти после проверки основных критериев
       { name: 'Обработка лимита построек на провинцию', func: () => processProvinceLimits(data, spreadsheet) },
       { name: 'Обработка лимита построек на государство', func: () => processStateLimits(data, spreadsheet) },
       { name: 'Обработка лимита построек на мир', func: () => processWorldLimits(data, spreadsheet) },
       { name: 'Обработка критериев наличия ресурсов', func: () => processRequiredResources(data, spreadsheet) },
       { name: 'Обработка агрокультурных земель', func: () => processArableLandRequirements(data, spreadsheet) },
       { name: 'Обработка критериев наличия рабочих', func: () => processRequiredWorkers(data, spreadsheet) },
-      { name: 'Построение транспортных маршрутов', func: () => updateResourcesAvailable(data, spreadsheet) }
+
+      // Создание транспортных маршрутов
+      { name: 'Построение транспортных маршрутов', func: () => updateResourcesAvailable(data, spreadsheet) },
+
+      // Все что касаеться обработки товаров зданиями
+      { name: 'Продажа товаров постройками', func: () => processSalesForBuildings(data, spreadsheet) },
+      { name: 'Закупка товаров постройками', func: () => processPurchaseGoodsForBuildings(data, spreadsheet) },
+      { name: 'Обработка торговых обьявлений', func: () => processBuildingTradeOrders(data, spreadsheet) },
+      { name: 'Потребление товаров', func: () => processResourceConsumption(data, spreadsheet) },
+      { name: 'Добыча ресурсов', func: () => processResourceExtraction(data, spreadsheet) },
+      { name: 'Производство товаров', func: () => processResourceProduction(data, spreadsheet) }
     ];
 
     // Выполнение всех функций по порядку

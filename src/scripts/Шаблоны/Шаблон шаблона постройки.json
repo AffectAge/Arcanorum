@@ -25,6 +25,18 @@
       "quantity": 80
     }
   ],
+"resource_consumption": [
+    {
+      "resource": "Железо",
+      "quantity": 200
+    }
+  ],
+  "resource_production": [
+      {
+        "resource": "Железо",
+        "quantity": 20
+      }
+    ],
 "required_landscapes":{
   "AND": [
     "FOREST",
