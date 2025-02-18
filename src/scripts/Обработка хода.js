@@ -76,6 +76,8 @@ function processTurn(data, sheet, spreadsheet) {
       { name: 'Обработка агрокультурных земель', func: () => processArableLandRequirements(data, spreadsheet) },
       { name: 'Обработка критериев наличия рабочих', func: () => processRequiredWorkers(data, spreadsheet) },
 
+      { name: 'Обновление статусов зданий', func: () => updateBuildingsStatuses(data, spreadsheet) },
+
       // Создание транспортных маршрутов
       { name: 'Построение транспортных маршрутов', func: () => updateResourcesAvailable(data, spreadsheet) },
 
@@ -85,7 +87,9 @@ function processTurn(data, sheet, spreadsheet) {
       { name: 'Обработка торговых обьявлений', func: () => processBuildingTradeOrders(data, spreadsheet) },
       { name: 'Потребление товаров', func: () => processResourceConsumption(data, spreadsheet) },
       { name: 'Добыча ресурсов', func: () => processResourceExtraction(data, spreadsheet) },
-      { name: 'Производство товаров', func: () => processResourceProduction(data, spreadsheet) }
+      { name: 'Производство товаров', func: () => processResourceProduction(data, spreadsheet) },
+
+      { name: 'Производство товаров', func: () => updateTradeStatistics(data, spreadsheet) }
     ];
 
     // Выполнение всех функций по порядку
