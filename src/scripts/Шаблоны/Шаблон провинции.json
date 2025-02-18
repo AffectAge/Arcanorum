@@ -17,7 +17,7 @@
   "resources": [
     {
       "resource": "wood",
-      "quantity": 100
+      "quantity": 10000
     },
     {
       "resource": "stone",
