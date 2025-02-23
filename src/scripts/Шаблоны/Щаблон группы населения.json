@@ -1,72 +1,75 @@
 {
-  "pops": [
+  "province_id": "Киев",
+  "unemployed_workers": 2600,
+  "employed_workers": 1000,
+  "professions": [
     {
-      "province_id": "3",
-	  "culture": "anglo",
-      "religion": "protestant",
-      "demographics": {
-        "total_population": 12000,
-        "gender_ratio": {
-          "male": 6000,
-          "female": 6000
-        }
-      },
-      "employment": {
-        "total_workers": 7000,
-        "employed_workers": 6500,
-        "unemployed_workers": 500,
-        "professions": {
-          "Фермеры": 2500,
-          "Рабочие": 2000,
-          "Военные": 2500,
-          "Учёные": 2000,
-          "Предприниматели": 2500,
-          "Священнослужители": 2000,
-          "Бюрократы": 2500,
-          "Рабы": 2000,
-          "Артисты": 2500
-        }
-      },
-      "wealth": {
-        "money": 25000
-      },
-      "political": {
-        "radicals": 600,
-        "loyalists": 4000,
-        "neutral": 3500
-      },
-      "interest_groups": {
-        "Церковь": {
-          "radicals": 200,
-          "loyalists": 1800,
-          "neutral": 1000
-        },
-        "Армия": {
-          "radicals": 200,
-          "loyalists": 1800,
-          "neutral": 1000
-        },
-        "Профсоюзы": {
-          "radicals": 200,
-          "loyalists": 1800,
-          "neutral": 1000
-        },
-        "Интеллигенция": {
-          "radicals": 150,
-          "loyalists": 1500,
-          "neutral": 850
-        },
-        "Капиталисты": {
-          "radicals": 150,
-          "loyalists": 1500,
-          "neutral": 850
-        },
-        "Землевладельцы": {
-          "radicals": 100,
-          "loyalists": 900,
-          "neutral": 700
-        }
-      }
+      "Безработные": 300,
+      "Учёные": 100,
+      "Военнослужащие": 100,
+      "Фермеры": 100,
+      "Бизнесмены": 50,
+      "Чиновники": 50,
+      "Священнослужители": 50,
+      "Рабочие": 300
     }
   ]
+}
+
+{
+  "pops": [
+    {
+      "culture": "Римская",
+      "religion": "Католичество",
+      "male_population": 1000,
+      "female_population": 500,
+      "loyalists": 800,
+      "neutral": 200,
+      "radical": 500,
+      "turmoil": 0.5,
+      "money": 35000,
+      "expected_standard _of_living": 10,
+      "current_standard_of_living": 15,
+      "last_standard_of_living": 14,
+      "incomes": 15000,
+      "expenses": 12000,
+      "total_population": 1500
+    },
+    {
+      "culture": "Украинская",
+      "religion": "Католичество",
+      "male_population": 1000,
+      "female_population": 500,
+      "loyalists": 800,
+      "neutral": 200,
+      "radical": 500,
+      "turmoil": 0.5,
+      "money": 35000,
+      "expected_standard _of_living": 10,
+      "current_standard_of_living": 15,
+      "last_standard_of_living": 14,
+      "incomes": 15000,
+      "expenses": 12000,
+      "total_population": 1500
+    }
+  ],
+  "professions": [
+    {
+      "Безработные": 300,
+      "Учёные": 100,
+      "Военнослужащие": 100,
+      "Фермеры": 100,
+      "Бизнесмены": 50,
+      "Чиновники": 50,
+      "Священнослужители": 50,
+      "Рабочие": 300
+    }
+  ],
+  "total_province_population": 3000,
+  "male_province_population": 1000,
+  "female_province_population": 1000,
+  "province_id": "Киев",
+  "total_workers": 3000,
+  "employed_workers": 1000,
+  "unemployed_workers": 2400
 }
