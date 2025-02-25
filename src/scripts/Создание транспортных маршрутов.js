@@ -26,44 +26,43 @@ function updateResourcesAvailable(data, spreadsheet) {
     }
 
     // 1. Получение state_name и Доступные для транспорта страны из Переменные
-let stateName = '';
-let accessibleCountries = [];
+    let stateName = '';
+    let accessibleCountries = [];
 
-try {
-  // Поиск строки с идентификатором "Основные данные государства"
-  const stateRow = data['Переменные'].find(row => row[0] === 'Основные данные государства');
-  if (stateRow && stateRow[1]) {
-    const jsonMatch = stateRow[1].match(/\{.*\}/);
-    if (jsonMatch) {
-      const variablesJson = JSON.parse(jsonMatch[0]);
-      stateName = (variablesJson.state_name || '').toLowerCase();
-      if (!stateName) {
-        throw new Error('Ключ "state_name" отсутствует или пуст.');
+    try {
+      // Поиск строки с идентификатором "Основные данные государства"
+      const stateRow = data['Переменные'].find(row => row[0] === 'Основные данные государства');
+      if (stateRow && stateRow[1]) {
+        const jsonMatch = stateRow[1].match(/\{.*\}/);
+        if (jsonMatch) {
+          const variablesJson = JSON.parse(jsonMatch[0]);
+          stateName = (variablesJson.state_name || '').toLowerCase();
+          if (!stateName) {
+            throw new Error('Ключ "state_name" отсутствует или пуст.');
+          }
+        } else {
+          throw new Error('Не удалось извлечь JSON из содержимого "Основные данные государства".');
+        }
+      } else {
+        throw new Error('Идентификатор "Основные данные государства" не найден в "Переменные".');
       }
-    } else {
-      throw new Error('Не удалось извлечь JSON из содержимого "Основные данные государства".');
+
+      // Поиск строки с идентификатором "Доступные для транспорта страны"
+      const accCountriesRow = data['Переменные'].find(row => row[0].toLowerCase() === 'доступные для транспорта страны');
+      if (accCountriesRow && accCountriesRow[1]) {
+        const parsedAcc = JSON.parse(accCountriesRow[1]);
+        accessibleCountries = Array.isArray(parsedAcc) ? parsedAcc.map(x => x.toLowerCase()) : [];
+      } else {
+        throw new Error('Идентификатор "Доступные для транспорта страны" не найден или пуст в "Переменные".');
+      }
+    } catch (e) {
+      messages.push(`[Ошибка][updateResourcesAvailable] Ошибка при извлечении stateName или Доступные для транспорта страны: ${e.message}`);
+      return messages;
     }
-  } else {
-    throw new Error('Идентификатор "Основные данные государства" не найден в "Переменные".');
-  }
-
-  // Поиск строки с идентификатором "Доступные для транспорта страны"
-  const accCountriesRow = data['Переменные'].find(row => row[0].toLowerCase() === 'доступные для транспорта страны');
-  if (accCountriesRow && accCountriesRow[1]) {
-    const parsedAcc = JSON.parse(accCountriesRow[1]);
-    accessibleCountries = Array.isArray(parsedAcc) ? parsedAcc.map(x => x.toLowerCase()) : [];
-  } else {
-    throw new Error('Идентификатор "Доступные для транспорта страны" не найден или пуст в "Переменные".');
-  }
-} catch (e) {
-  messages.push(`[Ошибка][updateResourcesAvailable] Ошибка при извлечении stateName или Доступные для транспорта страны: ${e.message}`);
-  return messages;
-}
-
 
     //--------------------------------------------------------------------------
     // 2. Извлекаем настройки (Настройки): transportTypes, resourceCategories,
-    //    coastalLandscapes, allowedLandscapes
+    //    coastalLandscapes, allowedLandscapes, а теперь ещё sea_routes_landscapes
     //--------------------------------------------------------------------------
     const settingsData = data['Настройки'];
     if (!settingsData) {
@@ -75,6 +74,7 @@ try {
     let resourceCategories = [];
     let allowedLandscapes = {}; // { land:[...], water:[...], ... }
     let coastalLandscapes = [];
+    let seaRoutesLandscapes = [];  // новый массив
 
     try {
       // (A) "Типы транспорта" - JSON-массив, напр. ["land","water","air","space"]
@@ -87,12 +87,12 @@ try {
       if (!rowRes) throw new Error('Нет строки "Категории товаров"');
       resourceCategories = JSON.parse(rowRes[1]) || [];
 
-      // (C) "Настройки торговых путей" - JSON-объект, внутри ключ coastal_landscapes
-      // например: { "coastal_landscapes":["coast","shore"] }
+      // (C) "Настройки торговых путей" - JSON-объект, внутри ключ coastal_landscapes и sea_routes_landscapes
       const rowTrade = settingsData.find(r => r[0] && r[0].toLowerCase() === 'настройки торговых путей');
       if (!rowTrade) throw new Error('Нет строки "Настройки торговых путей"');
       const tradeObj = JSON.parse(rowTrade[1]);
       coastalLandscapes = (tradeObj.coastal_landscapes || []).map(x => x.toLowerCase());
+      seaRoutesLandscapes = (tradeObj.sea_routes_landscapes || []).map(x => x.toLowerCase());
 
       // (D) "Ландшафты маршрутов" - JSON-объект, напр. { land:["plain","forest"], water:[], air:[], space:[] }
       const rowLands = settingsData.find(r => r[0] && r[0].toLowerCase() === 'ландшафты маршрутов');
@@ -100,7 +100,7 @@ try {
       allowedLandscapes = JSON.parse(rowLands[1]) || {};
       Object.keys(allowedLandscapes).forEach(k => {
         if (Array.isArray(allowedLandscapes[k])) {
-          allowedLandscapes[k] = allowedLandscapes[k].map(x=>x.toLowerCase());
+          allowedLandscapes[k] = allowedLandscapes[k].map(x => x.toLowerCase());
         }
       });
     } catch(e) {
@@ -122,26 +122,26 @@ try {
     const otherProvinces = [];
 
     try {
-      provData.forEach((row,rowIndex) => {
+      provData.forEach((row, rowIndex) => {
         const cell = row[0];
         if (!cell) return;
         let js = cell;
 
         // Убираем внешние кавычки, если есть
         if (js.startsWith('"') && js.endsWith('"')) {
-          js = js.slice(1,-1);
+          js = js.slice(1, -1);
         }
         // Заменяем "" на "
-        js = js.replace(/""/g,'"');
+        js = js.replace(/""/g, '"');
 
         const pObj = JSON.parse(js);
-        if (!pObj.id) throw new Error(`Нет поля "id" (строка ${rowIndex+1})`);
+        if (!pObj.id) throw new Error(`Нет поля "id" (строка ${rowIndex + 1})`);
 
         // Нормализуем landscapes
         if (!Array.isArray(pObj.landscapes)) {
           pObj.landscapes = [];
         } else {
-          pObj.landscapes = pObj.landscapes.map(l=>l.toLowerCase());
+          pObj.landscapes = pObj.landscapes.map(l => l.toLowerCase());
         }
         // Neighbors
         if (!Array.isArray(pObj.neighbors)) {
@@ -151,16 +151,16 @@ try {
         if (!Array.isArray(pObj.planet)) {
           pObj.planet = [];
         } else {
-          pObj.planet = pObj.planet.map(x=>x.toLowerCase());
+          pObj.planet = pObj.planet.map(x => x.toLowerCase());
         }
         // transport_infrastructure
         if (!pObj.transport_infrastructure) {
-          // создадим пустое
+          // создаём пустое
           pObj.transport_infrastructure = {
             types: transportTypes.map(tType => ({
               type: tType,
-              capacity: resourceCategories.reduce((acc,r)=>{acc[r]=0;return acc;},{}),
-              available: resourceCategories.reduce((acc,r)=>{acc[r]=0;return acc;},{}),
+              capacity: resourceCategories.reduce((acc, r) => { acc[r] = 0; return acc; }, {}),
+              available: resourceCategories.reduce((acc, r) => { acc[r] = 0; return acc; }, {})
             }))
           };
         }
@@ -181,7 +181,7 @@ try {
 
     // Список доступных чужих
     const allowedOtherProvinces = otherProvinces.filter(pid => {
-      const ow = (provincesMap[pid].owner||'').toLowerCase();
+      const ow = (provincesMap[pid].owner || '').toLowerCase();
       return accessibleCountries.includes(ow);
     });
 
@@ -206,7 +206,7 @@ try {
     //--------------------------------------------------------------------------
     // 5A) Проверка ландшафта
     function hasAllowedLandscapeForTransport(pv, tType) {
-      if (!allowedLandscapes[tType] || allowedLandscapes[tType].length===0) {
+      if (!allowedLandscapes[tType] || allowedLandscapes[tType].length === 0) {
         // нет ограничений
         return true;
       }
@@ -215,7 +215,7 @@ try {
     }
     // 5B) Проверка, coastal ли провинция
     function isCoastal(pv) {
-      return pv.landscapes.some(l=> coastalLandscapes.includes(l));
+      return pv.landscapes.some(l => coastalLandscapes.includes(l));
     }
     // 5C) sharePlanet
     function sharePlanet(pidA, pidB) {
@@ -227,9 +227,9 @@ try {
     function getCapacity(pid, tType, resource) {
       const pv = provincesMap[pid];
       if (!pv || !pv.transport_infrastructure) return 0;
-      const tObj = pv.transport_infrastructure.types.find(x=> x.type===tType);
+      const tObj = pv.transport_infrastructure.types.find(x => x.type === tType);
       if (!tObj) return 0;
-      return tObj.capacity[resource]||0;
+      return tObj.capacity[resource] || 0;
     }
     // 5E) Словарь для русских названий транспорта
     const transportTypeDescriptions = {
@@ -251,17 +251,23 @@ try {
       // friendlySet = наши + доступные
       const friendlySet = new Set([...stateProvinces, ...allowedOtherProvinces]);
 
-      // (A) Создаём вершины (pId-transport), если capacity>0 и ландшафт ок
+      // (A) Создаём вершины (pId-transport)
       transportTypes.forEach(tType => {
         friendlySet.forEach(pid => {
           const pv = provincesMap[pid];
           if (!hasAllowedLandscapeForTransport(pv, tType)) return;
-          const cVal = getCapacity(pid, tType, resource);
-          if (cVal>0) {
-            const key = `${pid}-${tType}`;
-            graph.vertices[key] = { pId: pid, transport: tType };
-            graph.edges[key] = [];
+          if (tType === 'water') {
+            // Для водного транспорта: допускаем создание вершины,
+            // если либо есть положительная capacity, либо провинция соответствует sea_routes_landscapes
+            const hasCapacity = getCapacity(pid, 'water', resource) > 0;
+            const isSeaRoute = pv.landscapes.some(l => seaRoutesLandscapes.includes(l));
+            if (!(hasCapacity || isSeaRoute)) return;
+          } else {
+            if (getCapacity(pid, tType, resource) <= 0) return;
           }
+          const key = `${pid}-${tType}`;
+          graph.vertices[key] = { pId: pid, transport: tType };
+          graph.edges[key] = [];
         });
       });
 
@@ -270,7 +276,7 @@ try {
         const { pId, transport } = graph.vertices[vKey];
         const capA = getCapacity(pId, transport, resource);
         transportTypes.forEach(otherT => {
-          if (otherT===transport) return;
+          if (otherT === transport) return;
           const otherKey = `${pId}-${otherT}`;
           if (graph.vertices[otherKey]) {
             const capB = getCapacity(pId, otherT, resource);
@@ -282,10 +288,6 @@ try {
       });
 
       // (C) Горизонтальные рёбра
-      //  land: по neighbors (и sharePlanet)
-      //  water: пары coastal + sharePlanet
-      //  air: пары на одной планете
-      //  space: пары без планеты
 
       // --- land ---
       friendlySet.forEach(pid => {
@@ -295,68 +297,80 @@ try {
         pv.neighbors.forEach(nId => {
           const neighKey = `${nId}-land`;
           if (!graph.vertices[neighKey]) return;
-          if (!sharePlanet(pid,nId)) return;
-          const cA = getCapacity(pid,'land',resource);
-          const cB = getCapacity(nId,'land',resource);
-          const mm = Math.min(cA,cB);
-          if (mm>0) {
-            graph.edges[landKey].push({ to: neighKey, capacity:mm });
-            graph.edges[neighKey].push({ to: landKey, capacity:mm });
+          if (!sharePlanet(pid, nId)) return;
+          const cA = getCapacity(pid, 'land', resource);
+          const cB = getCapacity(nId, 'land', resource);
+          const mm = Math.min(cA, cB);
+          if (mm > 0) {
+            graph.edges[landKey].push({ to: neighKey, capacity: mm });
+            graph.edges[neighKey].push({ to: landKey, capacity: mm });
           }
         });
       });
 
       // --- water ---
-      const waterVerts = Object.keys(graph.vertices).filter(k=>k.endsWith('-water'));
-      for (let i=0; i<waterVerts.length; i++){
-        for (let j=i+1; j<waterVerts.length; j++){
-          const vA = waterVerts[i], vB = waterVerts[j];
-          const { pId:pA } = graph.vertices[vA];
-          const { pId:pB } = graph.vertices[vB];
-          if (!sharePlanet(pA,pB)) continue;
-          if (!isCoastal(provincesMap[pA])) continue;
-          if (!isCoastal(provincesMap[pB])) continue;
-          const cA = getCapacity(pA,'water',resource);
-          const cB = getCapacity(pB,'water',resource);
-          const mm = Math.min(cA,cB);
-          if (mm>0) {
-            graph.edges[vA].push({ to: vB, capacity:mm });
-            graph.edges[vB].push({ to: vA, capacity:mm });
-          }
+      // Построение рёбер для водного транспорта на основе соседства
+      // Вспомогательная функция: effectiveWaterCapacity – если провинция coastal, берём её capacity,
+      // иначе, если соответствует sea_routes_landscapes, возвращаем Infinity (неограниченно)
+      function effectiveWaterCapacity(pid) {
+        const pv = provincesMap[pid];
+        if (isCoastal(pv)) {
+          return getCapacity(pid, 'water', resource);
+        } else if (pv.landscapes.some(l => seaRoutesLandscapes.includes(l))) {
+          return Infinity;
         }
+        return 0;
       }
+      const waterVerts = Object.keys(graph.vertices).filter(k => k.endsWith('-water'));
+      waterVerts.forEach(vKey => {
+        const { pId } = graph.vertices[vKey];
+        const pv = provincesMap[pId];
+        if (!pv.neighbors || !Array.isArray(pv.neighbors)) return;
+        pv.neighbors.forEach(nId => {
+          const neighborKey = `${nId}-water`;
+          if (!graph.vertices[neighborKey]) return;
+          if (!sharePlanet(pId, nId)) return;
+          const capA = effectiveWaterCapacity(pId);
+          const capB = effectiveWaterCapacity(nId);
+          const mm = Math.min(capA, capB);
+          if (mm > 0) {
+            graph.edges[vKey].push({ to: neighborKey, capacity: mm });
+            graph.edges[neighborKey].push({ to: vKey, capacity: mm });
+          }
+        });
+      });
 
       // --- air ---
-      const airVerts = Object.keys(graph.vertices).filter(k=>k.endsWith('-air'));
-      for (let i=0; i<airVerts.length; i++){
-        for (let j=i+1; j<airVerts.length; j++){
+      const airVerts = Object.keys(graph.vertices).filter(k => k.endsWith('-air'));
+      for (let i = 0; i < airVerts.length; i++) {
+        for (let j = i + 1; j < airVerts.length; j++) {
           const vA = airVerts[i], vB = airVerts[j];
-          const { pId:pA } = graph.vertices[vA];
-          const { pId:pB } = graph.vertices[vB];
-          if (!sharePlanet(pA,pB)) continue;
-          const cA = getCapacity(pA,'air',resource);
-          const cB = getCapacity(pB,'air',resource);
-          const mm = Math.min(cA,cB);
-          if (mm>0) {
-            graph.edges[vA].push({ to: vB, capacity:mm });
-            graph.edges[vB].push({ to: vA, capacity:mm });
+          const { pId: pA } = graph.vertices[vA];
+          const { pId: pB } = graph.vertices[vB];
+          if (!sharePlanet(pA, pB)) continue;
+          const cA = getCapacity(pA, 'air', resource);
+          const cB = getCapacity(pB, 'air', resource);
+          const mm = Math.min(cA, cB);
+          if (mm > 0) {
+            graph.edges[vA].push({ to: vB, capacity: mm });
+            graph.edges[vB].push({ to: vA, capacity: mm });
           }
         }
       }
 
       // --- space ---
-      const spaceVerts = Object.keys(graph.vertices).filter(k=>k.endsWith('-space'));
-      for (let i=0; i<spaceVerts.length; i++){
-        for (let j=i+1; j<spaceVerts.length; j++){
+      const spaceVerts = Object.keys(graph.vertices).filter(k => k.endsWith('-space'));
+      for (let i = 0; i < spaceVerts.length; i++) {
+        for (let j = i + 1; j < spaceVerts.length; j++) {
           const vA = spaceVerts[i], vB = spaceVerts[j];
-          const { pId:pA } = graph.vertices[vA];
-          const { pId:pB } = graph.vertices[vB];
-          const cA = getCapacity(pA,'space',resource);
-          const cB = getCapacity(pB,'space',resource);
-          const mm = Math.min(cA,cB);
-          if (mm>0) {
-            graph.edges[vA].push({ to: vB, capacity:mm });
-            graph.edges[vB].push({ to: vA, capacity:mm });
+          const { pId: pA } = graph.vertices[vA];
+          const { pId: pB } = graph.vertices[vB];
+          const cA = getCapacity(pA, 'space', resource);
+          const cB = getCapacity(pB, 'space', resource);
+          const mm = Math.min(cA, cB);
+          if (mm > 0) {
+            graph.edges[vA].push({ to: vB, capacity: mm });
+            graph.edges[vB].push({ to: vA, capacity: mm });
           }
         }
       }
@@ -376,8 +390,8 @@ try {
         if (v.pId === startPId) startKeys.push(vKey);
         if (v.pId === endPId) endKeys.add(vKey);
       }
-      if (startKeys.length===0 || endKeys.size===0) {
-        return { bottleneck:0, path:[] };
+      if (startKeys.length === 0 || endKeys.size === 0) {
+        return { bottleneck: 0, path: [] };
       }
 
       // dist[vKey] - лучший (максимальный) bottleneck от старта
@@ -389,18 +403,18 @@ try {
       });
 
       let queue = [];
-      // инициализация
+      // Инициализация
       startKeys.forEach(sk => {
         dist[sk] = Infinity;
         queue.push(sk);
       });
-      queue.sort((a,b)=> dist[b] - dist[a]);
+      queue.sort((a, b) => dist[b] - dist[a]);
 
-      while(queue.length>0) {
+      while (queue.length > 0) {
         const current = queue.shift();
         const curVal = dist[current];
         if (endKeys.has(current)) {
-          // восстановим маршрут
+          // Восстанавливаем маршрут
           const pathArr = restorePath(current);
           return { bottleneck: curVal, path: pathArr };
         }
@@ -413,12 +427,12 @@ try {
             queue.push(edge.to);
           }
         }
-        queue.sort((a,b)=> dist[b] - dist[a]);
+        queue.sort((a, b) => dist[b] - dist[a]);
       }
 
-      return { bottleneck:0, path:[] };
+      return { bottleneck: 0, path: [] };
 
-      // восстановление пути, указываем (провинция(русское_название_транспорта))
+      // Функция восстановления пути с указанием транспорта на русском
       function restorePath(endV) {
         const arr = [];
         let c = endV;
@@ -451,48 +465,54 @@ try {
     //--------------------------------------------------------------------------
     // 9. Для каждого ресурса -> строим граф -> ищем путь (pId->capitalId) -> записываем
     //--------------------------------------------------------------------------
-    resourceCategories.forEach(resource => {
-      const layeredGraph = buildLayeredGraphForResource(resource);
+resourceCategories.forEach(resource => {
+  const layeredGraph = buildLayeredGraphForResource(resource);
 
-      stateProvinces.forEach(pId => {
-        if (pId===capitalId) return; // пропускаем столицу
-        const { bottleneck, path } = findMaxBottleneckPath(layeredGraph, pId, capitalId);
-        if (bottleneck>0) {
-          // записываем
-          const pv = provincesMap[pId];
-          pv.transport_infrastructure.types.forEach(tObj => {
-            if (transportTypes.includes(tObj.type)) {
-              // Можно заменить на = bottleneck, или max(...)
-              tObj.available[resource] = Math.max(tObj.available[resource], bottleneck);
-            }
-          });
-          // Выводим маршрут
-          messages.push(`[Транспортные коридоры: ${resource}] 🗾 Провинция ${pId} может транспортировать: 📦${bottleneck} единиц продукции, маршрут: ${path.join('🢂')}`);
-        } else {
-          messages.push(`[${resource}] 🗾 Нет пути от провинции=${pId} до столицы=${capitalId}`);
+  stateProvinces.forEach(pId => {
+    if (pId === capitalId) return; // пропускаем столицу
+
+    // Добавляем проверку: если провинция имеет хотя бы один ландшафт из sea_routes_landscapes, то пропускаем расчет для нее.
+    const pv = provincesMap[pId];
+    if (pv.landscapes.some(l => seaRoutesLandscapes.includes(l))) {
+      messages.push(`[${resource}] 🗾 Провинция ${pId} имеет ландшафт sea_routes_landscapes — маршрут к столице не рассчитывается.`);
+      return;
+    }
+
+    const { bottleneck, path } = findMaxBottleneckPath(layeredGraph, pId, capitalId);
+    if (bottleneck > 0) {
+      // Записываем значение available для всех транспортных типов провинции
+      pv.transport_infrastructure.types.forEach(tObj => {
+        if (transportTypes.includes(tObj.type)) {
+          tObj.available[resource] = Math.max(tObj.available[resource], bottleneck);
         }
       });
-    });
+      // Выводим маршрут в лог
+      messages.push(`[Транспортные коридоры: ${resource}] 🗾 Провинция ${pId} может транспортировать: 📦${bottleneck} единиц продукции, маршрут: ${path.join('🢂')}`);
+    } else {
+      messages.push(`[${resource}] 🗾 Нет пути от провинции=${pId} до столицы=${capitalId}`);
+    }
+  });
+});
 
     //--------------------------------------------------------------------------
     // 10. Сохраняем обратно в data['Провинции_ОсновнаяИнформация']
     //--------------------------------------------------------------------------
-    const updatedProvs = provData.map((row,rowIndex) => {
+    const updatedProvs = provData.map((row, rowIndex) => {
       const cell = row[0];
       if (!cell) return row;
       try {
         let js = cell;
         if (js.startsWith('"') && js.endsWith('"')) {
-          js = js.slice(1,-1);
+          js = js.slice(1, -1);
         }
-        js = js.replace(/""/g,'"');
+        js = js.replace(/""/g, '"');
         const pObj = JSON.parse(js);
         if (pObj.id && provincesMap[pObj.id]) {
           pObj.transport_infrastructure = provincesMap[pObj.id].transport_infrastructure;
           return [JSON.stringify(pObj)];
         }
       } catch(e) {
-        messages.push(`[Ошибка][Сохранение] Строка=${rowIndex+1}: ${e.message}`);
+        messages.push(`[Ошибка][Сохранение] Строка=${rowIndex + 1}: ${e.message}`);
       }
       return row;
     });
