@@ -1,9 +1,11 @@
 /**
  * Функция для обновления маршрутов к столицам стран из торговых договоров.
- * Использует ту же логику построения маршрутов (граф, вычисление макс. потока) 
- * что и в updateResourcesAvailable, но записывает available в данные торговых партнёров.
- *
- * Сообщения формируются в стиле updateResourcesAvailable с группировкой маршрутов по типу транспорта.
+ * Использует ту же логику построения маршрутов (граф, вычисление макс. потока),
+ * что и в updateResourcesAvailable, но friendly set формируется как объединение:
+ * - наших провинций,
+ * - провинций конкретной иностранной страны (из торговых договоров),
+ * - и провинций стран, указанных в переменной «Доступные для транспорта страны».
+ * Итоговый available записывается в данные торговых партнёров (data['Торговые_Партнёры']).
  *
  * @param {Object} data - Объект с данными из именованных диапазонов:
  *   - data['Переменные']
@@ -62,6 +64,25 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       return messages;
     }
     messages.push(`[INFO] Найдено торговых договоров: ${tradeAgreements.length}`);
+    
+    // Извлекаем "Доступные для транспорта страны" (для разрешения прохождения маршрутов через их провинции)
+    let accessibleCountries = [];
+    try {
+      const accCountriesRow = varsData.find(row => row[0].toLowerCase() === 'доступные для транспорта страны');
+      if (accCountriesRow && accCountriesRow[1]) {
+         accessibleCountries = JSON.parse(accCountriesRow[1]);
+         if (!Array.isArray(accessibleCountries)) {
+            throw new Error('Доступные для транспорта страны должны быть массивом.');
+         }
+         accessibleCountries = accessibleCountries.map(x => x.toLowerCase());
+      } else {
+         throw new Error('Идентификатор "Доступные для транспорта страны" не найден или пуст.');
+      }
+    } catch(e) {
+      messages.push(`[Ошибка] ${e.message}`);
+      return messages;
+    }
+    messages.push(`[INFO] Доступны для транспорта страны: ${accessibleCountries.join(', ')}`);
     
     // 2. Извлечение настроек
     const settingsData = data['Настройки'];
@@ -240,7 +261,7 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       return tObj.capacity[resource] || 0;
     }
     
-    // Определяем описания транспортных средств для сообщений (как в updateResourcesAvailable)
+    // Описания транспортных типов для сообщений (как в updateResourcesAvailable)
     const transportTypeDescriptions = {
       land: "🚚",
       water: "🛥️",
@@ -320,7 +341,7 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       return { flow: maxFlow, augPaths: allAugPaths };
     }
     
-    // Функция построения графа для ресурса с учетом friendlySet (наши + иностранные провинции)
+    // Функция построения графа для ресурса с учетом friendlySet (наши + иностранные провинции + провинции стран из "Доступные для транспорта страны")
     function buildLayeredGraphForResource(resource, friendlySet) {
       const graph = { vertices: {}, edges: {} };
       
@@ -458,13 +479,26 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       
       resourceCategories.forEach(resource => {
         let sumFlow = 0;
-        // Формируем friendly set: наши провинции + иностранные провинции для данной страны
-        const friendlySet = new Set([...stateProvinces, ...foreignProvIds]);
+        // Формируем friendly set: наши провинции + провинции иностранной страны + провинции стран из "Доступные для транспорта страны"
+        const foreignSet = new Set([...foreignProvIds]);
+        accessibleCountries.forEach(acCountry => {
+          if (foreignProvincesMap[acCountry]) {
+            foreignProvincesMap[acCountry].forEach(pid => foreignSet.add(pid));
+          }
+        });
+        const friendlySet = new Set([...stateProvinces, ...foreignSet]);
+        
         // Строим граф для данного ресурса
         const layeredGraph = buildLayeredGraphForResource(resource, friendlySet);
         
-        // Для каждой нашей провинции вычисляем поток до иностранной столицы
+        // Для каждой нашей провинции вычисляем поток до иностранной столицы,
+        // но если провинция имеет ландшафт из sea_routes_landscapes, маршрут не рассчитывается.
         stateProvinces.forEach(pId => {
+          if (provincesMap[pId].landscapes.some(l => seaRoutesLandscapes.includes(l))) {
+            messages.push(`[${resource}][${ta.country}] 🗾 Провинция ${pId} имеет ландшафт sea_routes_landscapes — маршрут к столице не рассчитывается.`);
+            return; // Пропускаем эту провинцию
+          }
+          
           // Определяем стартовые вершины для нашей провинции
           const startKeys = [];
           for (const vKey in layeredGraph.vertices) {
@@ -481,7 +515,7 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
           
           const { flow, augPaths } = computeMaxFlow(layeredGraph, startKeys, endKeys);
           if (flow > 0 && augPaths.length > 0) {
-            // Группировка маршрутов по типу транспорта (как в updateResourcesAvailable)
+            // Группируем маршруты по типу транспорта (как в updateResourcesAvailable)
             const routesByType = {};
             augPaths.forEach(item => {
               const type = item.startKey.split('-')[1];
