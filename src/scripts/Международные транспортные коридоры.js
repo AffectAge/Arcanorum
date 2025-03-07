@@ -3,6 +3,8 @@
  * Использует ту же логику построения маршрутов (граф, вычисление макс. потока) 
  * что и в updateResourcesAvailable, но записывает available в данные торговых партнёров.
  *
+ * Сообщения формируются в стиле updateResourcesAvailable с группировкой маршрутов по типу транспорта.
+ *
  * @param {Object} data - Объект с данными из именованных диапазонов:
  *   - data['Переменные']
  *   - data['Настройки']
@@ -109,7 +111,7 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
     }
     const provincesMap = {};
     const stateProvinces = []; // наши провинции (owner === stateName)
-    // Для иностранных провинций создаём мапу: ключ – название страны (в нижнем регистре), значение – массив id провинций
+    // Для иностранных провинций создаём мапу: ключ – название страны (нижний регистр), значение – массив id провинций
     const foreignProvincesMap = {};
     try {
       provData.forEach((row, rowIndex) => {
@@ -212,8 +214,7 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       }
     });
     
-    // 6. Вспомогательные функции, общие для расчёта маршрутов
-    
+    // 6. Вспомогательные функции для вычисления маршрутов
     function hasAllowedLandscapeForTransport(pv, tType) {
       if (!allowedLandscapes[tType] || allowedLandscapes[tType].length === 0) {
         return true;
@@ -238,6 +239,14 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       if (!tObj) return 0;
       return tObj.capacity[resource] || 0;
     }
+    
+    // Определяем описания транспортных средств для сообщений (как в updateResourcesAvailable)
+    const transportTypeDescriptions = {
+      land: "🚚",
+      water: "🛥️",
+      air: "🛫",
+      space: "🚀"
+    };
     
     // Функция вычисления максимального потока (алгоритм Эдмондса–Карпа)
     function computeMaxFlow(graph, startKeys, endKeys) {
@@ -311,8 +320,7 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
       return { flow: maxFlow, augPaths: allAugPaths };
     }
     
-    // Функция построения графа для ресурса с учетом заданного friendlySet
-    // (friendlySet – объединение наших провинций и провинций иностранного государства)
+    // Функция построения графа для ресурса с учетом friendlySet (наши + иностранные провинции)
     function buildLayeredGraphForResource(resource, friendlySet) {
       const graph = { vertices: {}, edges: {} };
       
@@ -472,11 +480,30 @@ function updateTradeRoutesToPartners(data, spreadsheet) {
           if (startKeys.length === 0 || endKeys.size === 0) return;
           
           const { flow, augPaths } = computeMaxFlow(layeredGraph, startKeys, endKeys);
-          if (flow > 0) {
-            sumFlow += flow;
-            messages.push(`[Маршрут][${ta.country}][${resource}] Провинция ${pId} -> Столица ${capId}: поток ${flow} ед.`);
+          if (flow > 0 && augPaths.length > 0) {
+            // Группировка маршрутов по типу транспорта (как в updateResourcesAvailable)
+            const routesByType = {};
+            augPaths.forEach(item => {
+              const type = item.startKey.split('-')[1];
+              if (!routesByType[type] || routesByType[type].flow < item.flow) {
+                routesByType[type] = item;
+              }
+            });
+            let provinceFlow = 0;
+            const routeStrs = [];
+            Object.keys(routesByType).forEach(type => {
+              const routeItem = routesByType[type];
+              provinceFlow += routeItem.flow;
+              const routePathStr = routeItem.path.map(k => {
+                const vObj = layeredGraph.vertices[k];
+                return `${vObj.pId}(${transportTypeDescriptions[vObj.transport] || vObj.transport})`;
+              }).join('🢂');
+              routeStrs.push(routePathStr + ` (${routeItem.flow} ед.)`);
+            });
+            sumFlow += provinceFlow;
+            messages.push(`[Объединённый граф (${resource})][${ta.country}] Провинция ${pId} может транспортировать суммарно: 📦${provinceFlow} ед., маршруты: ${routeStrs.join(' ; ')}`);
           } else {
-            messages.push(`[Маршрут][${ta.country}][${resource}] Нет потока от провинции ${pId} к столице ${capId}`);
+            messages.push(`[${resource}][${ta.country}] 🗾 Нет доступного потока от провинции ${pId} к столице ${capId}`);
           }
         });
         
