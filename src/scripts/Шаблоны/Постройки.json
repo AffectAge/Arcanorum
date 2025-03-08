@@ -8,12 +8,11 @@
       "land_efficiency": 1.0,
 	  "consumption_efficiency": 2.0,
 	  "production_efficiency": 2.0,
-      "extraction_efficiency": 1.5
+      "extraction_efficiency": 1.5,
+	  "transport_efficiency": 2.0
     },
   "warehouse": {
 	"Железо": {"current_quantity": 40, "reserve_level": 10}
   },
 "trade_orders": []
 }
-
-
